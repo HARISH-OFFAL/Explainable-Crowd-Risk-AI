@@ -1,4 +1,7 @@
-from fastapi import Depends, FastAPI
+import os
+import shutil
+
+from fastapi import Depends, FastAPI, File, Form, UploadFile
 from sqlalchemy.orm import Session
 
 from .database import Base, engine, get_db
@@ -189,4 +192,57 @@ def update_document_status(
         "document_name": document.document_name,
         "status": document.status,
         "remarks": document.remarks,
+    }
+
+
+@app.post("/documents/upload")
+def upload_document(
+    event_id: int = Form(...),
+    document_type: str = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    event = db.query(Event).filter(
+        Event.id == event_id
+    ).first()
+
+    if event is None:
+        return {
+            "message": "Event not found"
+        }
+
+    upload_folder = "uploads"
+    os.makedirs(upload_folder, exist_ok=True)
+
+    file_path = os.path.join(
+        upload_folder,
+        file.filename
+    )
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(
+            file.file,
+            buffer
+        )
+
+    new_document = EventDocument(
+        event_id=event_id,
+        document_type=document_type,
+        document_name=file.filename,
+        status="Pending",
+        remarks="Document uploaded successfully",
+    )
+
+    db.add(new_document)
+    db.commit()
+    db.refresh(new_document)
+
+    return {
+        "message": "Document uploaded successfully",
+        "document_id": new_document.id,
+        "event_id": new_document.event_id,
+        "document_type": new_document.document_type,
+        "document_name": new_document.document_name,
+        "status": new_document.status,
+        "file_path": file_path,
     }
