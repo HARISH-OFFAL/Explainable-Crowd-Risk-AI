@@ -66,6 +66,7 @@ def create_event(
             "risk_level": risk_result["risk_level"],
             "risk_score": risk_result["risk_score"],
             "reasons": risk_result["reasons"],
+            "recommendations": risk_result["recommendations"],
         },
     }
 
