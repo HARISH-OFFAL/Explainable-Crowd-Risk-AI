@@ -39,3 +39,15 @@ class EventDocumentCreate(BaseModel):
         default=None,
         max_length=500
     )
+
+
+class DocumentStatusUpdate(BaseModel):
+    status: str = Field(
+        min_length=1,
+        max_length=50
+    )
+
+    remarks: str | None = Field(
+        default=None,
+        max_length=500
+    )

@@ -3,7 +3,11 @@ from sqlalchemy.orm import Session
 
 from .database import Base, engine, get_db
 from .models import Event, EventDocument
-from .schemas import EventCreate, EventDocumentCreate
+from .schemas import (
+    EventCreate,
+    EventDocumentCreate,
+    DocumentStatusUpdate,
+)
 from .risk_engine import calculate_pre_event_risk
 
 
@@ -140,3 +144,49 @@ def get_documents(db: Session = Depends(get_db)):
         }
         for document in documents
     ]
+
+
+@app.put("/documents/{document_id}/status")
+def update_document_status(
+    document_id: int,
+    status_update: DocumentStatusUpdate,
+    db: Session = Depends(get_db)
+):
+    document = db.query(EventDocument).filter(
+        EventDocument.id == document_id
+    ).first()
+
+    if document is None:
+        return {
+            "message": "Document not found"
+        }
+
+    allowed_statuses = [
+        "Pending",
+        "Under Review",
+        "Approved",
+        "Rejected",
+        "Additional Information Required",
+    ]
+
+    if status_update.status not in allowed_statuses:
+        return {
+            "message": "Invalid status",
+            "allowed_statuses": allowed_statuses,
+        }
+
+    document.status = status_update.status
+    document.remarks = status_update.remarks
+
+    db.commit()
+    db.refresh(document)
+
+    return {
+        "message": "Document status updated successfully",
+        "document_id": document.id,
+        "event_id": document.event_id,
+        "document_type": document.document_type,
+        "document_name": document.document_name,
+        "status": document.status,
+        "remarks": document.remarks,
+    }
