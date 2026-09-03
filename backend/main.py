@@ -1,7 +1,7 @@
 import os
 import shutil
 
-from fastapi import Depends, FastAPI, File, Form, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from .database import Base, engine, get_db
@@ -106,9 +106,10 @@ def get_event(
     ).first()
 
     if event is None:
-        return {
-            "message": "Event not found"
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="Event not found"
+        )
 
     risk_result = calculate_pre_event_risk(
         expected_crowd_size=event.expected_crowd_size,
@@ -150,9 +151,10 @@ def update_event(
     ).first()
 
     if event is None:
-        return {
-            "message": "Event not found"
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="Event not found"
+        )
 
     event.event_name = updated_event.event_name
     event.location = updated_event.location
@@ -199,9 +201,10 @@ def create_document(
     ).first()
 
     if event is None:
-        return {
-            "message": "Event not found"
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="Event not found"
+        )
 
     new_document = EventDocument(
         event_id=document.event_id,
@@ -253,9 +256,10 @@ def get_event_documents(
     ).first()
 
     if event is None:
-        return {
-            "message": "Event not found"
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="Event not found"
+        )
 
     documents = db.query(EventDocument).filter(
         EventDocument.event_id == event_id
@@ -288,9 +292,10 @@ def update_document_status(
     ).first()
 
     if document is None:
-        return {
-            "message": "Document not found"
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found"
+        )
 
     allowed_statuses = [
         "Pending",
@@ -301,10 +306,13 @@ def update_document_status(
     ]
 
     if status_update.status not in allowed_statuses:
-        return {
-            "message": "Invalid status",
-            "allowed_statuses": allowed_statuses,
-        }
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Invalid status",
+                "allowed_statuses": allowed_statuses,
+            }
+        )
 
     document.status = status_update.status
     document.remarks = status_update.remarks
@@ -335,9 +343,10 @@ def upload_document(
     ).first()
 
     if event is None:
-        return {
-            "message": "Event not found"
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="Event not found"
+        )
 
     upload_folder = "uploads"
     os.makedirs(upload_folder, exist_ok=True)
