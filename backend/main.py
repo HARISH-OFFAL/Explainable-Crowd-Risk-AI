@@ -123,3 +123,20 @@ def create_document(
         "status": new_document.status,
         "remarks": new_document.remarks,
     }
+
+
+@app.get("/documents")
+def get_documents(db: Session = Depends(get_db)):
+    documents = db.query(EventDocument).all()
+
+    return [
+        {
+            "id": document.id,
+            "event_id": document.event_id,
+            "document_type": document.document_type,
+            "document_name": document.document_name,
+            "status": document.status,
+            "remarks": document.remarks,
+        }
+        for document in documents
+    ]
