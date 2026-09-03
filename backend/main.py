@@ -149,6 +149,40 @@ def get_documents(db: Session = Depends(get_db)):
     ]
 
 
+@app.get("/events/{event_id}/documents")
+def get_event_documents(
+    event_id: int,
+    db: Session = Depends(get_db)
+):
+    event = db.query(Event).filter(
+        Event.id == event_id
+    ).first()
+
+    if event is None:
+        return {
+            "message": "Event not found"
+        }
+
+    documents = db.query(EventDocument).filter(
+        EventDocument.event_id == event_id
+    ).all()
+
+    return {
+        "event_id": event.id,
+        "event_name": event.event_name,
+        "documents": [
+            {
+                "id": document.id,
+                "document_type": document.document_type,
+                "document_name": document.document_name,
+                "status": document.status,
+                "remarks": document.remarks,
+            }
+            for document in documents
+        ],
+    }
+
+
 @app.put("/documents/{document_id}/status")
 def update_document_status(
     document_id: int,
