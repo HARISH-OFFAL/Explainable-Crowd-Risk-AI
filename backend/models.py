@@ -21,3 +21,32 @@ class Event(Base):
     emergency_exits: Mapped[int] = mapped_column(Integer, nullable=False)
 
     event_duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class EventDocument(Base):
+    __tablename__ = "event_documents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+
+    event_id: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    document_type: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False
+    )
+
+    document_name: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="Pending"
+    )
+
+    remarks: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True
+    )

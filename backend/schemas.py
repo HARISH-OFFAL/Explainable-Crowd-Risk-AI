@@ -14,3 +14,28 @@ class EventCreate(BaseModel):
     emergency_exits: int = Field(ge=0)
 
     event_duration_minutes: int = Field(gt=0)
+
+
+class EventDocumentCreate(BaseModel):
+    event_id: int = Field(gt=0)
+
+    document_type: str = Field(
+        min_length=1,
+        max_length=100
+    )
+
+    document_name: str = Field(
+        min_length=1,
+        max_length=255
+    )
+
+    status: str = Field(
+        default="Pending",
+        min_length=1,
+        max_length=50
+    )
+
+    remarks: str | None = Field(
+        default=None,
+        max_length=500
+    )

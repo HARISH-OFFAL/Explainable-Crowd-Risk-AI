@@ -2,8 +2,8 @@ from fastapi import Depends, FastAPI
 from sqlalchemy.orm import Session
 
 from .database import Base, engine, get_db
-from .models import Event
-from .schemas import EventCreate
+from .models import Event, EventDocument
+from .schemas import EventCreate, EventDocumentCreate
 from .risk_engine import calculate_pre_event_risk
 
 
@@ -29,7 +29,6 @@ def create_event(
     event: EventCreate,
     db: Session = Depends(get_db)
 ):
-    # Calculate pre-event risk automatically
     risk_result = calculate_pre_event_risk(
         expected_crowd_size=event.expected_crowd_size,
         venue_capacity=event.venue_capacity,
@@ -39,7 +38,6 @@ def create_event(
         event_duration_minutes=event.event_duration_minutes,
     )
 
-    # Create event
     new_event = Event(
         event_name=event.event_name,
         location=event.location,
@@ -52,12 +50,10 @@ def create_event(
         event_duration_minutes=event.event_duration_minutes,
     )
 
-    # Save event to database
     db.add(new_event)
     db.commit()
     db.refresh(new_event)
 
-    # Return event details with risk assessment
     return {
         "message": "Event registered successfully",
         "event_id": new_event.id,
@@ -90,3 +86,40 @@ def get_events(db: Session = Depends(get_db)):
         }
         for event in events
     ]
+
+
+@app.post("/documents")
+def create_document(
+    document: EventDocumentCreate,
+    db: Session = Depends(get_db)
+):
+    event = db.query(Event).filter(
+        Event.id == document.event_id
+    ).first()
+
+    if event is None:
+        return {
+            "message": "Event not found"
+        }
+
+    new_document = EventDocument(
+        event_id=document.event_id,
+        document_type=document.document_type,
+        document_name=document.document_name,
+        status=document.status,
+        remarks=document.remarks,
+    )
+
+    db.add(new_document)
+    db.commit()
+    db.refresh(new_document)
+
+    return {
+        "message": "Document added successfully",
+        "document_id": new_document.id,
+        "event_id": new_document.event_id,
+        "document_type": new_document.document_type,
+        "document_name": new_document.document_name,
+        "status": new_document.status,
+        "remarks": new_document.remarks,
+    }
