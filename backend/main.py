@@ -8,6 +8,7 @@ from .database import Base, engine, get_db
 from .models import Event, EventDocument
 from .schemas import (
     EventCreate,
+    EventUpdate,
     EventDocumentCreate,
     DocumentStatusUpdate,
 )
@@ -129,6 +130,56 @@ def get_event(
         "exit_gates": event.exit_gates,
         "emergency_exits": event.emergency_exits,
         "event_duration_minutes": event.event_duration_minutes,
+        "pre_event_risk": {
+            "risk_level": risk_result["risk_level"],
+            "risk_score": risk_result["risk_score"],
+            "reasons": risk_result["reasons"],
+            "recommendations": risk_result["recommendations"],
+        },
+    }
+
+
+@app.put("/events/{event_id}")
+def update_event(
+    event_id: int,
+    updated_event: EventUpdate,
+    db: Session = Depends(get_db)
+):
+    event = db.query(Event).filter(
+        Event.id == event_id
+    ).first()
+
+    if event is None:
+        return {
+            "message": "Event not found"
+        }
+
+    event.event_name = updated_event.event_name
+    event.location = updated_event.location
+    event.event_datetime = updated_event.event_datetime
+    event.expected_crowd_size = updated_event.expected_crowd_size
+    event.venue_capacity = updated_event.venue_capacity
+    event.entry_gates = updated_event.entry_gates
+    event.exit_gates = updated_event.exit_gates
+    event.emergency_exits = updated_event.emergency_exits
+    event.event_duration_minutes = updated_event.event_duration_minutes
+
+    db.commit()
+    db.refresh(event)
+
+    risk_result = calculate_pre_event_risk(
+        expected_crowd_size=event.expected_crowd_size,
+        venue_capacity=event.venue_capacity,
+        entry_gates=event.entry_gates,
+        exit_gates=event.exit_gates,
+        emergency_exits=event.emergency_exits,
+        event_duration_minutes=event.event_duration_minutes,
+    )
+
+    return {
+        "message": "Event updated successfully",
+        "event_id": event.id,
+        "event_name": event.event_name,
         "pre_event_risk": {
             "risk_level": risk_result["risk_level"],
             "risk_score": risk_result["risk_score"],
