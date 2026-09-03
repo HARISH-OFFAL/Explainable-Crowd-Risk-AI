@@ -355,6 +355,30 @@ def update_document_status(
     }
 
 
+@app.delete("/documents/{document_id}")
+def delete_document(
+    document_id: int,
+    db: Session = Depends(get_db)
+):
+    document = db.query(EventDocument).filter(
+        EventDocument.id == document_id
+    ).first()
+
+    if document is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found"
+        )
+
+    db.delete(document)
+    db.commit()
+
+    return {
+        "message": "Document deleted successfully",
+        "document_id": document_id
+    }
+
+
 @app.post("/documents/upload")
 def upload_document(
     event_id: int = Form(...),
