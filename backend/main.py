@@ -95,6 +95,49 @@ def get_events(db: Session = Depends(get_db)):
     ]
 
 
+@app.get("/events/{event_id}")
+def get_event(
+    event_id: int,
+    db: Session = Depends(get_db)
+):
+    event = db.query(Event).filter(
+        Event.id == event_id
+    ).first()
+
+    if event is None:
+        return {
+            "message": "Event not found"
+        }
+
+    risk_result = calculate_pre_event_risk(
+        expected_crowd_size=event.expected_crowd_size,
+        venue_capacity=event.venue_capacity,
+        entry_gates=event.entry_gates,
+        exit_gates=event.exit_gates,
+        emergency_exits=event.emergency_exits,
+        event_duration_minutes=event.event_duration_minutes,
+    )
+
+    return {
+        "id": event.id,
+        "event_name": event.event_name,
+        "location": event.location,
+        "event_datetime": event.event_datetime,
+        "expected_crowd_size": event.expected_crowd_size,
+        "venue_capacity": event.venue_capacity,
+        "entry_gates": event.entry_gates,
+        "exit_gates": event.exit_gates,
+        "emergency_exits": event.emergency_exits,
+        "event_duration_minutes": event.event_duration_minutes,
+        "pre_event_risk": {
+            "risk_level": risk_result["risk_level"],
+            "risk_score": risk_result["risk_score"],
+            "reasons": risk_result["reasons"],
+            "recommendations": risk_result["recommendations"],
+        },
+    }
+
+
 @app.post("/documents")
 def create_document(
     document: EventDocumentCreate,
