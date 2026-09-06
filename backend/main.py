@@ -1,7 +1,16 @@
 import os
 import shutil
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+)
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from .database import Base, engine, get_db
@@ -25,12 +34,37 @@ app = FastAPI(
 )
 
 
+# ---------------------------------------------------------
+# CORS CONFIGURATION
+# Allows React frontend to communicate with FastAPI backend
+# ---------------------------------------------------------
+
+allowed_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 @app.get("/")
 def root():
     return {
         "message": "Explainable Crowd Risk AI API is running"
     }
 
+
+# =========================================================
+# EVENT ENDPOINTS
+# =========================================================
 
 @app.post("/events")
 def create_event(
@@ -76,7 +110,9 @@ def create_event(
 
 
 @app.get("/events")
-def get_events(db: Session = Depends(get_db)):
+def get_events(
+    db: Session = Depends(get_db)
+):
     events = db.query(Event).all()
 
     return [
@@ -101,9 +137,11 @@ def get_event(
     event_id: int,
     db: Session = Depends(get_db)
 ):
-    event = db.query(Event).filter(
-        Event.id == event_id
-    ).first()
+    event = (
+        db.query(Event)
+        .filter(Event.id == event_id)
+        .first()
+    )
 
     if event is None:
         raise HTTPException(
@@ -146,9 +184,11 @@ def update_event(
     updated_event: EventUpdate,
     db: Session = Depends(get_db)
 ):
-    event = db.query(Event).filter(
-        Event.id == event_id
-    ).first()
+    event = (
+        db.query(Event)
+        .filter(Event.id == event_id)
+        .first()
+    )
 
     if event is None:
         raise HTTPException(
@@ -159,12 +199,22 @@ def update_event(
     event.event_name = updated_event.event_name
     event.location = updated_event.location
     event.event_datetime = updated_event.event_datetime
-    event.expected_crowd_size = updated_event.expected_crowd_size
-    event.venue_capacity = updated_event.venue_capacity
+
+    event.expected_crowd_size = (
+        updated_event.expected_crowd_size
+    )
+
+    event.venue_capacity = (
+        updated_event.venue_capacity
+    )
+
     event.entry_gates = updated_event.entry_gates
     event.exit_gates = updated_event.exit_gates
     event.emergency_exits = updated_event.emergency_exits
-    event.event_duration_minutes = updated_event.event_duration_minutes
+
+    event.event_duration_minutes = (
+        updated_event.event_duration_minutes
+    )
 
     db.commit()
     db.refresh(event)
@@ -196,9 +246,11 @@ def delete_event(
     event_id: int,
     db: Session = Depends(get_db)
 ):
-    event = db.query(Event).filter(
-        Event.id == event_id
-    ).first()
+    event = (
+        db.query(Event)
+        .filter(Event.id == event_id)
+        .first()
+    )
 
     if event is None:
         raise HTTPException(
@@ -215,14 +267,20 @@ def delete_event(
     }
 
 
+# =========================================================
+# DOCUMENT ENDPOINTS
+# =========================================================
+
 @app.post("/documents")
 def create_document(
     document: EventDocumentCreate,
     db: Session = Depends(get_db)
 ):
-    event = db.query(Event).filter(
-        Event.id == document.event_id
-    ).first()
+    event = (
+        db.query(Event)
+        .filter(Event.id == document.event_id)
+        .first()
+    )
 
     if event is None:
         raise HTTPException(
@@ -254,7 +312,9 @@ def create_document(
 
 
 @app.get("/documents")
-def get_documents(db: Session = Depends(get_db)):
+def get_documents(
+    db: Session = Depends(get_db)
+):
     documents = db.query(EventDocument).all()
 
     return [
@@ -275,9 +335,11 @@ def get_event_documents(
     event_id: int,
     db: Session = Depends(get_db)
 ):
-    event = db.query(Event).filter(
-        Event.id == event_id
-    ).first()
+    event = (
+        db.query(Event)
+        .filter(Event.id == event_id)
+        .first()
+    )
 
     if event is None:
         raise HTTPException(
@@ -285,9 +347,13 @@ def get_event_documents(
             detail="Event not found"
         )
 
-    documents = db.query(EventDocument).filter(
-        EventDocument.event_id == event_id
-    ).all()
+    documents = (
+        db.query(EventDocument)
+        .filter(
+            EventDocument.event_id == event_id
+        )
+        .all()
+    )
 
     return {
         "event_id": event.id,
@@ -305,15 +371,64 @@ def get_event_documents(
     }
 
 
+# =========================================================
+# NEW: OPEN / VIEW UPLOADED DOCUMENT
+# =========================================================
+
+@app.get("/documents/{document_id}/file")
+def view_document_file(
+    document_id: int,
+    db: Session = Depends(get_db)
+):
+    document = (
+        db.query(EventDocument)
+        .filter(
+            EventDocument.id == document_id
+        )
+        .first()
+    )
+
+    if document is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found"
+        )
+
+    safe_filename = os.path.basename(
+        document.document_name
+    )
+
+    file_path = os.path.join(
+        "uploads",
+        safe_filename
+    )
+
+    if not os.path.isfile(file_path):
+        raise HTTPException(
+            status_code=404,
+            detail="Uploaded file not found"
+        )
+
+    return FileResponse(
+        path=file_path,
+        filename=safe_filename,
+        content_disposition_type="inline",
+    )
+
+
 @app.put("/documents/{document_id}/status")
 def update_document_status(
     document_id: int,
     status_update: DocumentStatusUpdate,
     db: Session = Depends(get_db)
 ):
-    document = db.query(EventDocument).filter(
-        EventDocument.id == document_id
-    ).first()
+    document = (
+        db.query(EventDocument)
+        .filter(
+            EventDocument.id == document_id
+        )
+        .first()
+    )
 
     if document is None:
         raise HTTPException(
@@ -360,9 +475,13 @@ def delete_document(
     document_id: int,
     db: Session = Depends(get_db)
 ):
-    document = db.query(EventDocument).filter(
-        EventDocument.id == document_id
-    ).first()
+    document = (
+        db.query(EventDocument)
+        .filter(
+            EventDocument.id == document_id
+        )
+        .first()
+    )
 
     if document is None:
         raise HTTPException(
@@ -386,9 +505,11 @@ def upload_document(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    event = db.query(Event).filter(
-        Event.id == event_id
-    ).first()
+    event = (
+        db.query(Event)
+        .filter(Event.id == event_id)
+        .first()
+    )
 
     if event is None:
         raise HTTPException(
@@ -397,11 +518,18 @@ def upload_document(
         )
 
     upload_folder = "uploads"
-    os.makedirs(upload_folder, exist_ok=True)
+    os.makedirs(
+        upload_folder,
+        exist_ok=True
+    )
+
+    safe_filename = os.path.basename(
+        file.filename
+    )
 
     file_path = os.path.join(
         upload_folder,
-        file.filename
+        safe_filename
     )
 
     with open(file_path, "wb") as buffer:
@@ -413,7 +541,7 @@ def upload_document(
     new_document = EventDocument(
         event_id=event_id,
         document_type=document_type,
-        document_name=file.filename,
+        document_name=safe_filename,
         status="Pending",
         remarks="Document uploaded successfully",
     )

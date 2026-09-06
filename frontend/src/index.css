@@ -1,0 +1,59 @@
+:root { font-family: Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #F1F5F9; background: #07111F; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body, #root { min-width: 320px; min-height: 100%; background-color: #07111F; }
+body { min-height: 100vh; background-color: #07111F; }
+::selection { color: #031108; background: #1db954; }
+
+/* Subtle desktop-only interface cursor. Form controls fall back to the native cursor. */
+.cg-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10000;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  transform: translate3d(-50px, -50px, 0);
+  transition: opacity .18s ease;
+}
+
+.cg-cursor-dot,
+.cg-cursor-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  transform: translate(-50%, -50%);
+}
+
+.cg-cursor-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #b7ffd0;
+  box-shadow: 0 0 8px rgba(29, 185, 84, .65);
+}
+
+.cg-cursor-ring {
+  width: 17px;
+  height: 17px;
+  border: 1px solid rgba(93, 230, 137, .58);
+  border-radius: 50%;
+  box-shadow: 0 0 9px rgba(29, 185, 84, .13);
+  transition: width .18s ease, height .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.cg-cursor.is-interactive .cg-cursor-ring {
+  width: 25px;
+  height: 25px;
+  border-color: rgba(93, 230, 137, .82);
+  box-shadow: 0 0 12px rgba(29, 185, 84, .25);
+}
+
+.cg-cursor.is-hidden { opacity: 0; }
+.cg-custom-cursor-active,
+.cg-custom-cursor-active * { cursor: none; }
+
+@media (pointer: coarse), (hover: none) {
+  .cg-cursor { display: none; }
+}
