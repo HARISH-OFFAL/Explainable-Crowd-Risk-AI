@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 
 import Navbar from '../components/Navbar'
+import FileDropzone from '../components/FileDropzone'
 
 const API_URL = 'http://127.0.0.1:8000'
 
@@ -577,28 +578,8 @@ function Documents() {
                   </div>
 
                   <div className="document-form-group">
-                    <label htmlFor="document-file">
-                      Choose File
-                    </label>
-
-                    <input
-                      id="document-file"
-                      type="file"
-                      onChange={(event) =>
-                        setSelectedFile(
-                          event.target.files?.[0] ||
-                            null
-                        )
-                      }
-                      required
-                    />
-
-                    {selectedFile && (
-                      <small>
-                        Selected:{' '}
-                        {selectedFile.name}
-                      </small>
-                    )}
+                    <span className="dropzone-label">Document file</span>
+                    <FileDropzone file={selectedFile} onChange={setSelectedFile} />
                   </div>
 
                   <button

@@ -1,0 +1,4 @@
+candidate_id,frame_number,timestamp_sec,difference_score
+SCENE_CAND_001,626,20.8667,0.895725
+SCENE_CAND_002,1454,48.4667,0.860001
+SCENE_CAND_003,5597,186.5667,0.902289

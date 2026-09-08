@@ -1,0 +1,49 @@
+UMN ZONE-LEVEL CROWD ACTIVITY MODEL
+===================================
+
+This is a NORMAL vs ABNORMAL crowd-activity model.
+It is not claimed as official LOW/MEDIUM/HIGH crowd-risk ground truth.
+
+VALIDATION
+----------
+accuracy: 0.9285714285714286
+precision: 0.7142857142857143
+recall: 0.7142857142857143
+f1: 0.7142857142857143
+auc: 0.9533527696793003
+tn: 47
+fp: 2
+fn: 2
+tp: 5
+
+UNSEEN TEST
+-----------
+accuracy: 0.9830508474576272
+precision: 0.8571428571428571
+recall: 1.0
+f1: 0.9230769230769231
+auc: 1.0
+tn: 52
+fp: 1
+fn: 0
+tp: 6
+
+FEATURE COEFFICIENTS
+--------------------
+avg_bbox_area_ratio: -1.780133
+avg_detection_confidence: +1.491632
+speed_std_norm_s: +1.037648
+valid_motion_rows: -0.824745
+zone_presence_ratio: -0.746387
+direction_consistency: +0.739663
+movement_activity_ratio: -0.631570
+avg_person_count_per_frame: -0.542489
+max_bbox_area_ratio: -0.446204
+acceleration_std_norm_s2: +0.337545
+unique_person_count: +0.251825
+avg_speed_norm_s: +0.234358
+avg_movement_distance_norm: +0.234354
+max_person_count_per_frame: +0.225160
+avg_acceleration_norm_s2: +0.154324
+max_speed_norm_s: -0.101865
+avg_direction_change_deg: +0.072482

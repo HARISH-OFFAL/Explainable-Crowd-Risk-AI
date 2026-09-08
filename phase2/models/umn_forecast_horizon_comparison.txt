@@ -1,0 +1,57 @@
+UMN FORECAST HORIZON MODEL COMPARISON
+=====================================
+
+Horizon selection uses only TRAIN + VALIDATION sequences.
+Final TEST sequences remain held out.
+
+2 SECOND HORIZON
+Positive samples: 9
+Negative samples: 54
+Accuracy: 0.6508
+Precision: 0.1905
+Recall: 0.4444
+F1: 0.2667
+ROC-AUC: 0.5103
+Mean Fold F1: 0.2169
+Mean Fold ROC-AUC: 0.5296
+
+4 SECOND HORIZON
+Positive samples: 18
+Negative samples: 45
+Accuracy: 0.5079
+Precision: 0.2759
+Recall: 0.4444
+F1: 0.3404
+ROC-AUC: 0.4494
+Mean Fold F1: 0.2815
+Mean Fold ROC-AUC: 0.5061
+
+6 SECOND HORIZON
+Positive samples: 27
+Negative samples: 36
+Accuracy: 0.5397
+Precision: 0.4667
+Recall: 0.5185
+F1: 0.4912
+ROC-AUC: 0.5813
+Mean Fold F1: 0.4630
+Mean Fold ROC-AUC: 0.6202
+
+8 SECOND HORIZON
+Positive samples: 35
+Negative samples: 28
+Accuracy: 0.4921
+Precision: 0.5429
+Recall: 0.5429
+F1: 0.5429
+ROC-AUC: 0.4918
+Mean Fold F1: 0.4892
+Mean Fold ROC-AUC: 0.5172
+
+BEST DEVELOPMENT HORIZON
+------------------------
+Horizon: 6 seconds
+ROC-AUC: 0.5813
+F1: 0.4912
+
+Final TEST sequences were not used during horizon selection.

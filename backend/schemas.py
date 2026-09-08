@@ -66,3 +66,24 @@ class DocumentStatusUpdate(BaseModel):
         default=None,
         max_length=500
     )
+
+
+class MonitoringSessionCreate(BaseModel):
+    source_type: str = Field(default="recorded", min_length=1, max_length=30)
+    source_name: str = Field(min_length=1, max_length=255)
+
+
+class Phase2RiskUpdate(BaseModel):
+    timestamp: str | None = Field(default=None, max_length=50)
+    zone_a_people: int = Field(default=0, ge=0)
+    zone_b_people: int = Field(default=0, ge=0)
+    zone_c_people: int = Field(default=0, ge=0)
+    zone_a_risk_score: float | None = None
+    zone_a_risk_level: str | None = Field(default=None, max_length=30)
+    zone_b_risk_score: float | None = None
+    zone_b_risk_level: str | None = Field(default=None, max_length=30)
+    zone_c_risk_score: float | None = None
+    zone_c_risk_level: str | None = Field(default=None, max_length=30)
+    future_risk_score: float | None = None
+    future_risk_level: str | None = Field(default=None, max_length=30)
+    xai_summary: str | None = Field(default=None, max_length=1000)

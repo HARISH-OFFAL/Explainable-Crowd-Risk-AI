@@ -1,0 +1,75 @@
+UMN CURRENT CROWD ACTIVITY MODEL V2
+===================================
+
+MODEL PURPOSE
+-------------
+Behaviour-focused zone-level NORMAL vs ABNORMAL crowd activity research baseline.
+
+CAMERA-SENSITIVE FEATURES REMOVED
+---------------------------------
+avg_bbox_area_ratio
+max_bbox_area_ratio
+avg_detection_confidence
+valid_motion_rows
+
+FEATURES USED
+-------------
+zone_presence_ratio
+unique_person_count
+avg_person_count_per_frame
+max_person_count_per_frame
+avg_movement_distance_norm
+avg_speed_norm_s
+max_speed_norm_s
+speed_std_norm_s
+avg_acceleration_norm_s2
+acceleration_std_norm_s2
+avg_direction_change_deg
+direction_consistency
+movement_activity_ratio
+
+VALIDATION
+----------
+accuracy: 0.875
+precision: 0.5
+recall: 1.0
+f1: 0.6666666666666666
+auc: 1.0
+tn: 42
+fp: 7
+fn: 0
+tp: 7
+
+UNSEEN TEST
+-----------
+accuracy: 0.8305084745762712
+precision: 0.3333333333333333
+recall: 0.6666666666666666
+f1: 0.4444444444444444
+auc: 0.908805031446541
+tn: 45
+fp: 8
+fn: 2
+tp: 4
+
+FEATURE COEFFICIENTS
+--------------------
+direction_consistency: +0.820086
+speed_std_norm_s: +0.659957
+avg_direction_change_deg: -0.517370
+movement_activity_ratio: -0.487171
+max_speed_norm_s: -0.458193
+avg_speed_norm_s: +0.360086
+avg_movement_distance_norm: +0.360084
+unique_person_count: -0.239942
+max_person_count_per_frame: -0.229644
+acceleration_std_norm_s2: -0.222522
+zone_presence_ratio: -0.114586
+avg_person_count_per_frame: -0.099683
+avg_acceleration_norm_s2: +0.021210
+
+IMPORTANT LIMITATION
+--------------------
+The UMN labels used here represent NORMAL versus ABNORMAL crowd activity.
+This model is not claimed as an official LOW/MEDIUM/HIGH stampede-risk classifier.
+Cross-scene real-world validation is still required.

@@ -1,4 +1,6 @@
-:root { font-family: Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #F1F5F9; background: #07111F; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root { font-family: "Plus Jakarta Sans", "Segoe UI Variable", "Segoe UI", sans-serif; color: #F1F5F9; background: #07111F; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body, #root { min-width: 320px; min-height: 100%; background-color: #07111F; }
 body { min-height: 100vh; background-color: #07111F; }

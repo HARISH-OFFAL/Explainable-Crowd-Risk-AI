@@ -1,0 +1,48 @@
+UMN CURRENT ABNORMAL-CROWD CLASSIFIER
+=====================================
+
+IMPORTANT
+---------
+This model predicts NORMAL vs ABNORMAL crowd activity.
+It must not be described as official LOW/HIGH crowd-risk ground truth.
+Labels were reconstructed from embedded red-text onset in the local UMN video.
+
+VALIDATION METRICS
+------------------
+Accuracy  : 0.949086
+Precision : 0.512291
+Recall    : 0.912434
+F1 Score  : 0.656171
+ROC-AUC   : 0.980884
+
+TEST METRICS
+------------
+Accuracy  : 0.880658
+Precision : 0.267018
+Recall    : 0.901294
+F1 Score  : 0.411982
+ROC-AUC   : 0.941675
+
+TEST CONFUSION MATRIX
+---------------------
+TN: 11176
+FP: 1529
+FN: 61
+TP: 557
+
+FEATURE COEFFICIENTS
+--------------------
+bbox_area_ratio: +6.870213
+bbox_height: -5.109297
+bbox_width: -4.914060
+detection_confidence: +1.076768
+speed_norm_s: +0.857548
+movement_distance_norm: +0.857545
+consecutive_frames: -0.644497
+acceleration_norm_s2: -0.642687
+motion_valid: -0.606679
+direction_change_deg: -0.249135
+normalized_y: +0.182670
+normalized_x: +0.094838
+direction_cos: +0.082293
+direction_sin: +0.034678

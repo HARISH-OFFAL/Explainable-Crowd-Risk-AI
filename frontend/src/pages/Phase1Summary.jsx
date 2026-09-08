@@ -154,6 +154,7 @@ function Phase1Summary() {
           <div className="phase1-summary-actions">
             <button className="secondary-btn" onClick={() => navigate('/events')}>← Back to Organizer Events</button>
             <button className="secondary-btn" onClick={() => navigate('/organizer/dashboard')}>Organizer Dashboard</button>
+            <button className="primary-btn" onClick={() => navigate(`/organizer/events/${eventId}/monitoring`)}>Start Crowd Monitoring</button>
           </div>
         </div>
 

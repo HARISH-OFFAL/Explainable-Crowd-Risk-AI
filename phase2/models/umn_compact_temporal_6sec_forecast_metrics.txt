@@ -1,0 +1,69 @@
+UMN COMPACT TEMPORAL 6-SECOND FORECAST MODEL
+=====================================
+
+Samples: 79
+Features: 35
+History: previous 6 seconds
+Forecast horizon: next 6 seconds
+
+VALIDATION
+----------
+accuracy: 0.7333333333333333
+precision: 0.75
+recall: 0.5
+f1: 0.6
+roc_auc: 0.6666666666666667
+tn: 8
+fp: 1
+fn: 3
+tp: 3
+
+UNSEEN TEST
+-----------
+accuracy: 0.5625
+precision: 0.3333333333333333
+recall: 0.16666666666666666
+f1: 0.2222222222222222
+roc_auc: 0.5166666666666667
+tn: 8
+fp: 2
+fn: 5
+tp: 1
+
+FEATURE COEFFICIENTS
+--------------------
+H2_global_avg_person_count_per_frame: -0.447845
+H0_global_movement_activity_ratio: +0.414572
+DELTA_global_movement_activity_ratio: -0.350479
+H1_global_avg_acceleration_norm_s2: +0.313662
+H2_global_max_zone_person_count: -0.310775
+H1_global_direction_consistency: -0.307839
+H1_global_avg_person_count_per_frame: -0.276027
+H0_global_avg_direction_change_deg: -0.264228
+H2_global_avg_acceleration_norm_s2: +0.247500
+DELTA_global_avg_speed_norm_s: -0.227204
+DELTA_global_avg_person_count_per_frame: -0.221462
+H1_global_speed_std_norm_s: +0.210977
+H1_global_unique_person_count: -0.201018
+H2_global_avg_direction_change_deg: -0.200581
+H0_global_avg_person_count_per_frame: -0.178125
+H1_global_max_zone_person_count: -0.151366
+DELTA_global_direction_consistency: -0.147178
+H0_global_avg_acceleration_norm_s2: +0.139461
+H2_global_avg_speed_norm_s: -0.136515
+H1_global_movement_activity_ratio: +0.130255
+H0_global_speed_std_norm_s: +0.120721
+H2_global_speed_std_norm_s: +0.120607
+DELTA_global_unique_person_count: -0.111883
+DELTA_global_avg_direction_change_deg: +0.110978
+H2_global_direction_consistency: -0.100019
+H0_global_avg_speed_norm_s: +0.097837
+H0_global_max_zone_person_count: +0.094865
+DELTA_global_avg_acceleration_norm_s2: +0.081809
+H0_global_direction_consistency: +0.068431
+H1_global_avg_direction_change_deg: -0.055311
+H2_global_movement_activity_ratio: +0.052819
+H0_global_unique_person_count: +0.047859
+H2_global_unique_person_count: -0.043927
+H1_global_avg_speed_norm_s: -0.017339
+DELTA_global_speed_std_norm_s: +0.005367

@@ -1,0 +1,11 @@
+interval_id,start_frame,end_frame,start_time_sec,end_time_sec,label,source
+UMN_ABN_001,516,642,17.20,21.40,ABNORMAL,manual_inspection
+UMN_ABN_002,1308,1485,43.60,49.50,ABNORMAL,manual_inspection
+UMN_ABN_003,1804,2011,60.13,67.03,ABNORMAL,manual_inspection
+UMN_ABN_004,2574,2792,85.80,93.07,ABNORMAL,manual_inspection
+UMN_ABN_005,3200,3463,106.67,115.43,ABNORMAL,manual_inspection
+UMN_ABN_006,3931,4053,131.03,135.10,ABNORMAL,manual_inspection
+UMN_ABN_007,4791,4913,159.70,163.77,ABNORMAL,manual_inspection
+UMN_ABN_008,5424,5620,180.80,187.33,ABNORMAL,manual_inspection
+UMN_ABN_009,6165,6271,205.50,209.03,ABNORMAL,manual_inspection
+UMN_ABN_010,6843,7661,228.10,255.37,ABNORMAL,manual_inspection

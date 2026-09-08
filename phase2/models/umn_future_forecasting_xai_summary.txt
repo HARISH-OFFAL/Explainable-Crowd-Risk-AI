@@ -1,0 +1,78 @@
+UMN FUTURE FORECASTING XAI SUMMARY
+==================================
+
+FUTURE FORECASTING INTERPRETATION
+
+The forecasting model uses recent spatio-temporal crowd behaviour
+to estimate whether an abnormal crowd transition may occur within
+the next 6 seconds.
+
+The model considers temporal crowd information such as person count,
+movement activity, speed variation, acceleration behaviour, direction
+consistency, and related zone-derived global summaries.
+
+However, the final held-out evaluation showed insufficient
+generalization to unseen UMN sequences.
+
+FINAL HELD-OUT RESULT
+
+Accuracy  : 0.4375
+Precision : 0.0000
+Recall    : 0.0000
+F1 Score  : 0.0000
+ROC-AUC   : 0.4667
+
+Therefore:
+
+- The forecasting component is retained as a research baseline.
+- It must NOT be presented as an accurate real-world early-warning model.
+- The result shows that more independent labelled crowd sequences are
+  required for reliable future-risk forecasting.
+- No LOW/MEDIUM/HIGH threshold was created from this result.
+- Embedded red-text annotation onset in the local UMN video was used
+  only as a proxy temporal label.
+- It is not claimed as official UMN temporal ground truth.
+
+XAI LIMITATION
+
+Feature coefficients describe how the trained Logistic Regression model
+uses each feature. They explain model behaviour, but they do not prove
+that a feature causes abnormal crowd behaviour.
+
+TOP MODEL DRIVERS
+-----------------
+H2_global_avg_person_count_per_frame: -0.563364 -> away from future abnormal transition
+H0_global_movement_activity_ratio: +0.508154 -> toward future abnormal transition
+DELTA_global_movement_activity_ratio: -0.449479 -> away from future abnormal transition
+DELTA_global_avg_person_count_per_frame: -0.418221 -> away from future abnormal transition
+H1_global_direction_consistency: -0.386621 -> away from future abnormal transition
+DELTA_global_direction_consistency: -0.325752 -> away from future abnormal transition
+H0_global_avg_direction_change_deg: -0.308377 -> away from future abnormal transition
+H2_global_avg_direction_change_deg: -0.290064 -> away from future abnormal transition
+H2_global_direction_consistency: -0.222048 -> away from future abnormal transition
+H1_global_movement_activity_ratio: +0.210281 -> toward future abnormal transition
+H1_global_avg_acceleration_norm_s2: +0.206758 -> toward future abnormal transition
+DELTA_global_avg_speed_norm_s: -0.192264 -> away from future abnormal transition
+H0_global_avg_acceleration_norm_s2: +0.154712 -> toward future abnormal transition
+H2_global_avg_acceleration_norm_s2: +0.152660 -> toward future abnormal transition
+H0_global_unique_person_count: +0.142814 -> toward future abnormal transition
+H0_global_direction_consistency: +0.139072 -> toward future abnormal transition
+H2_global_avg_speed_norm_s: -0.136587 -> away from future abnormal transition
+H1_global_avg_person_count_per_frame: -0.134781 -> away from future abnormal transition
+H1_global_avg_speed_norm_s: -0.123988 -> away from future abnormal transition
+H1_global_unique_person_count: -0.120528 -> away from future abnormal transition
+DELTA_global_speed_std_norm_s: +0.115791 -> toward future abnormal transition
+H2_global_speed_std_norm_s: +0.115331 -> toward future abnormal transition
+H1_global_avg_direction_change_deg: +0.108844 -> toward future abnormal transition
+H2_global_unique_person_count: +0.094703 -> toward future abnormal transition
+H2_global_max_zone_person_count: -0.093882 -> away from future abnormal transition
+H0_global_avg_person_count_per_frame: -0.073712 -> away from future abnormal transition
+DELTA_global_unique_person_count: -0.071158 -> away from future abnormal transition
+H0_global_avg_speed_norm_s: +0.063531 -> toward future abnormal transition
+H1_global_max_zone_person_count: -0.045285 -> away from future abnormal transition
+H1_global_speed_std_norm_s: +0.035855 -> toward future abnormal transition
+H2_global_movement_activity_ratio: +0.035494 -> toward future abnormal transition
+DELTA_global_avg_direction_change_deg: +0.034209 -> toward future abnormal transition
+H0_global_max_zone_person_count: -0.025157 -> away from future abnormal transition
+H0_global_speed_std_norm_s: -0.009646 -> away from future abnormal transition
+DELTA_global_avg_acceleration_norm_s2: +0.000834 -> toward future abnormal transition

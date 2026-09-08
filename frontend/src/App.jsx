@@ -13,6 +13,7 @@ import Documents from './pages/Documents'
 import ApplicationStatus from './pages/ApplicationStatus'
 import CustomCursor from './components/CustomCursor'
 import Phase1Summary from './pages/Phase1Summary'
+import MonitoringLaunch from './pages/MonitoringLaunch'
 
 import './App.css'
 
@@ -69,6 +70,7 @@ function App() {
         <Route path="/organizer/application-status" element={<ApplicationStatus />} />
 
         <Route path="/organizer/events/:eventId/phase1-summary" element={<Phase1Summary />} />
+        <Route path="/organizer/events/:eventId/monitoring" element={<MonitoringLaunch />} />
       </Routes>
     </BrowserRouter>
   )

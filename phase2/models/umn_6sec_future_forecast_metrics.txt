@@ -1,0 +1,50 @@
+UMN 6-SECOND FUTURE CROWD FORECAST MODEL
+========================================
+
+TARGET
+------
+Predict whether abnormal crowd activity will begin within the next 6 seconds.
+
+VALIDATION METRICS
+------------------
+accuracy: 0.673469387755102
+precision: 0.45454545454545453
+recall: 0.3333333333333333
+f1: 0.38461538461538464
+roc_auc: 0.5254901960784313
+tn: 28
+fp: 6
+fn: 10
+tp: 5
+
+UNSEEN TEST METRICS
+-------------------
+accuracy: 0.5660377358490566
+precision: 0.3157894736842105
+recall: 0.375
+f1: 0.34285714285714286
+roc_auc: 0.4780405405405405
+tn: 24
+fp: 13
+fn: 10
+tp: 6
+
+FEATURE COEFFICIENTS
+--------------------
+speed_std_norm_s: +1.271703
+acceleration_std_norm_s2: -0.946541
+avg_bbox_area_ratio: +0.465668
+zone_presence_ratio: +0.334156
+avg_movement_distance_norm: -0.285280
+avg_speed_norm_s: -0.285278
+valid_motion_rows: -0.217834
+avg_detection_confidence: -0.216775
+avg_person_count_per_frame: +0.204437
+max_bbox_area_ratio: -0.153136
+avg_acceleration_norm_s2: +0.135002
+max_speed_norm_s: +0.106053
+movement_activity_ratio: +0.085853
+direction_consistency: +0.075875
+max_person_count_per_frame: -0.043167
+avg_direction_change_deg: -0.037443
+unique_person_count: -0.012507

@@ -1,0 +1,4 @@
+scene_id,scene_name,scene_start_frame,scene_end_frame,scene_start_time_sec,scene_end_time_sec,expected_sequence_count,sequence_boundaries_status,ground_truth_status,training_allowed,notes
+SCENE_01,Lawn,1,1453,0.0,48.4,2,VERIFICATION_REQUIRED,NOT_OFFICIAL,NO,Scene boundary based on local video inspection. Individual sequence boundaries and abnormal ground-truth intervals are not yet verified.
+SCENE_02,Indoor,1454,5596,48.4333,186.5,6,VERIFICATION_REQUIRED,NOT_OFFICIAL,NO,Scene boundary based on local video inspection. Individual sequence boundaries and abnormal ground-truth intervals are not yet verified.
+SCENE_03,Outdoor_Plaza,5597,7739,186.5333,257.9333,3,VERIFICATION_REQUIRED,NOT_OFFICIAL,NO,Scene boundary based on local video inspection. Individual sequence boundaries and abnormal ground-truth intervals are not yet verified.
