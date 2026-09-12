@@ -123,14 +123,14 @@ function EventRegistration() {
   }
 
   return (
-    <div className="app registration-page">
+    <div className="app registration-page ember-registration-app">
       <div className="background-grid" />
       <div className="glow glow-one" />
       <div className="glow glow-two" />
 
       <Navbar />
 
-      <main className="page-main">
+      <main className="page-main registration-main">
         <section className="page-heading">
           <div className="eyebrow">
             NEW EVENT
@@ -363,21 +363,6 @@ function EventRegistration() {
             </div>
           </form>
 
-          <aside className="guide-card glass-card">
-            <h3>What We Assess</h3>
-
-            <p>
-              The risk engine uses these planning details to explain
-              possible crowd-safety concerns.
-            </p>
-
-            <ul className="guide-list">
-              <li>Crowd vs venue capacity</li>
-              <li>Entry and exit availability</li>
-              <li>Emergency exit readiness</li>
-              <li>Event duration</li>
-            </ul>
-          </aside>
         </section>
       </main>
 

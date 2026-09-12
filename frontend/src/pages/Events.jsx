@@ -20,6 +20,16 @@ function toDateTimeInput(value) {
   return value ? String(value).slice(0, 16) : ''
 }
 
+function displayNumber(value) {
+  const number = Number(value)
+  return Number.isFinite(number) ? number.toLocaleString() : '—'
+}
+
+function riskLabel(event) {
+  const value = event.pre_event_risk?.risk_level || event.pre_event_risk?.level || event.risk_level
+  return typeof value === 'string' ? value.toUpperCase() : ''
+}
+
 function Events() {
   const navigate = useNavigate()
   const authority = useLocation().pathname.startsWith('/authority')
@@ -60,6 +70,17 @@ function Events() {
   useEffect(() => {
     loadEvents()
   }, [])
+
+  const now = Date.now()
+  const upcomingCount = events.filter((item) => {
+    const timestamp = Date.parse(item.event_datetime)
+    return Number.isFinite(timestamp) && timestamp >= now
+  }).length
+  const completedCount = events.filter((item) => {
+    const timestamp = Date.parse(item.event_datetime)
+    return Number.isFinite(timestamp) && timestamp < now
+  }).length
+  const highRiskCount = events.filter((item) => ['HIGH', 'CRITICAL', 'SEVERE'].includes(riskLabel(item))).length
 
   const viewEvent = async (id) => {
     try {
@@ -181,18 +202,18 @@ function Events() {
   }
 
   return (
-    <div className="app">
+    <div className="app events-page ember-events-app">
       <div className="background-grid" />
       <div className="glow glow-one" />
       <Navbar />
 
-      <main className="page-main">
+      <main className="page-main events-main">
         <div className="events-toolbar">
           <div>
             <div className="eyebrow">
               {authority ? 'AUTHORITY REVIEW QUEUE' : 'EVENT MANAGEMENT'}
             </div>
-            <h1>{authority ? 'Submitted Events' : 'Registered Events'}</h1>
+            <h1>{authority ? 'Submitted Events' : 'My Events'}</h1>
             <p>
               {authority
                 ? 'Select an event to inspect its details and existing risk result.'
@@ -206,6 +227,13 @@ function Events() {
             </button>
           )}
         </div>
+
+        <section className="events-summary" aria-label="Event summary">
+          <article><span>TOTAL EVENTS</span><strong>{events.length}</strong><small>registered records</small></article>
+          <article><span>UPCOMING</span><strong>{upcomingCount}</strong><small>scheduled events</small></article>
+          <article><span>COMPLETED</span><strong>{completedCount}</strong><small>past event dates</small></article>
+          <article><span>HIGH RISK</span><strong>{highRiskCount}</strong><small>{highRiskCount ? 'requires attention' : 'from available risk data'}</small></article>
+        </section>
 
         {error && <div className="form-error">{error}</div>}
 
@@ -225,22 +253,27 @@ function Events() {
           <div className="event-list">
             {events.map((item) => (
               <article className="event-row glass-card" key={item.id}>
-                <div>
+                <div className="event-identity">
+                  <span className="event-id">EVENT #{item.id}</span>
                   <h3>{item.event_name}</h3>
                   <p>{item.location}</p>
                 </div>
 
-                <div className="event-meta">
+                <div className="event-meta event-date-meta">
                   <span>{new Date(item.event_datetime).toLocaleString()}</span>
                   <span>
                     {item.expected_crowd_size.toLocaleString()} expected ·{' '}
                     {item.venue_capacity.toLocaleString()} capacity
                   </span>
+                  {riskLabel(item) && <b className={`event-risk risk-${riskLabel(item).toLowerCase()}`}>{riskLabel(item)} RISK</b>}
                 </div>
 
-                <div className="event-meta">
-                  <span>Event ID</span>
-                  <strong>#{item.id}</strong>
+                <div className="event-facts">
+                  <span><small>CROWD</small><b>{displayNumber(item.expected_crowd_size)}</b></span>
+                  <span><small>CAPACITY</small><b>{displayNumber(item.venue_capacity)}</b></span>
+                  <span><small>ENTRY / EXIT</small><b>{displayNumber(item.entry_gates)} / {displayNumber(item.exit_gates)}</b></span>
+                  <span><small>EMERGENCY</small><b>{displayNumber(item.emergency_exits)}</b></span>
+                  <span><small>DURATION</small><b>{displayNumber(item.event_duration_minutes)} min</b></span>
                 </div>
 
                 <div className="event-actions">
@@ -251,7 +284,7 @@ function Events() {
                   {!authority && (
                     <>
                       <button className="small-btn" onClick={() => navigate(`/organizer/events/${item.id}/phase1-summary`)}>
-                        Phase 1
+                        Monitor
                       </button>
                       <button className="small-btn" onClick={() => startEdit(item)}>
                         Edit

@@ -1,0 +1,2 @@
+# Phase 4 dependency (keep the existing requirements file unchanged if it contains legacy encoding).
+networkx==3.4.2

@@ -58,6 +58,12 @@ function Documents() {
   const [reviewRemarks, setReviewRemarks] =
     useState('')
 
+  const [documentToDelete, setDocumentToDelete] =
+    useState(null)
+
+  const [deletingDocument, setDeletingDocument] =
+    useState(false)
+
   useEffect(() => {
     fetchEvents()
   }, [])
@@ -338,6 +344,45 @@ function Documents() {
     }
   }
 
+  const deleteDocument = async () => {
+    if (!documentToDelete) return
+
+    try {
+      setDeletingDocument(true)
+      setError('')
+
+      const response = await fetch(
+        `${API_URL}/documents/${documentToDelete.id}`,
+        { method: 'DELETE' }
+      )
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          typeof data.detail === 'string'
+            ? data.detail
+            : 'Unable to delete document.'
+        )
+      }
+
+      setDocuments((currentDocuments) =>
+        currentDocuments.filter(
+          (document) => document.id !== documentToDelete.id
+        )
+      )
+      setSuccess('Document deleted successfully.')
+      setDocumentToDelete(null)
+    } catch (requestError) {
+      setError(
+        requestError.message ||
+          'Unable to delete document.'
+      )
+    } finally {
+      setDeletingDocument(false)
+    }
+  }
+
   const getSelectedEvent = () => {
     return events.find(
       (event) =>
@@ -377,10 +422,10 @@ function Documents() {
     getSelectedEvent()
 
   return (
-    <div className="documents-page">
+    <div className="documents-page ember-documents-page">
       <Navbar />
 
-      <main className="documents-main">
+      <main className="documents-main ember-documents-main">
         <section className="documents-heading">
           <div>
             <span>
@@ -791,11 +836,20 @@ function Documents() {
                                 Review Document
                               </button>
                             ) : (
-                              <span className="document-organizer-note">
-                                Status changes are
-                                made by the
-                                reviewing authority.
-                              </span>
+                              <>
+                                <span className="document-organizer-note">
+                                  Status changes are
+                                  made by the
+                                  reviewing authority.
+                                </span>
+                                <button
+                                  type="button"
+                                  className="document-delete-button"
+                                  onClick={() => setDocumentToDelete(document)}
+                                >
+                                  Delete Document
+                                </button>
+                              </>
                             )}
                           </div>
                         )}
@@ -826,6 +880,46 @@ function Documents() {
           </div>
         </section>
       </main>
+      {documentToDelete && (
+        <div
+          className="document-modal-backdrop"
+          role="presentation"
+          onClick={() => !deletingDocument && setDocumentToDelete(null)}
+        >
+          <div
+            className="document-delete-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-document-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="document-delete-icon">×</div>
+            <h2 id="delete-document-title">Delete Document?</h2>
+            <p>
+              This will permanently remove the selected document from this event.
+            </p>
+            <small>{documentToDelete.document_name}</small>
+            <div className="document-delete-actions">
+              <button
+                type="button"
+                className="document-cancel-button"
+                disabled={deletingDocument}
+                onClick={() => setDocumentToDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="document-confirm-delete"
+                disabled={deletingDocument}
+                onClick={deleteDocument}
+              >
+                {deletingDocument ? 'Deleting...' : 'Delete Document'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

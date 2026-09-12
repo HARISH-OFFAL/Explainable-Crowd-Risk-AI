@@ -19,6 +19,8 @@ function Phase1Summary() {
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [documentToDelete, setDocumentToDelete] = useState(null)
+  const [deletingDocument, setDeletingDocument] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -95,9 +97,25 @@ function Phase1Summary() {
     window.open(`${API_URL}/documents/${documentId}/file`, '_blank', 'noopener,noreferrer')
   }
 
+  const deleteDocument = async () => {
+    if (!documentToDelete) return
+    try {
+      setDeletingDocument(true)
+      const response = await fetch(`${API_URL}/documents/${documentToDelete.id}`, { method: 'DELETE' })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.detail || 'Unable to delete document.')
+      setDocuments((current) => current.filter((document) => document.id !== documentToDelete.id))
+      setDocumentToDelete(null)
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to delete document.')
+    } finally {
+      setDeletingDocument(false)
+    }
+  }
+
   if (loading) {
     return (
-      <div className="app">
+      <div className="app ember-phase1-page">
         <div className="background-grid" />
         <Navbar />
         <main className="empty-state"><div className="glass-card"><h2>Loading Phase 1 summary…</h2></div></main>
@@ -107,7 +125,7 @@ function Phase1Summary() {
 
   if (error || !event) {
     return (
-      <div className="app">
+      <div className="app ember-phase1-page">
         <div className="background-grid" />
         <Navbar />
         <main className="empty-state">
@@ -139,12 +157,12 @@ function Phase1Summary() {
   ]
 
   return (
-    <div className="app phase1-summary-page">
+    <div className="app phase1-summary-page ember-phase1-page">
       <div className="background-grid" />
       <div className="glow glow-one" />
       <Navbar />
 
-      <main className="page-main">
+      <main className="page-main phase1-main">
         <div className="phase1-summary-header">
           <div>
             <div className="eyebrow">PHASE 1 SAFETY SUMMARY</div>
@@ -158,50 +176,41 @@ function Phase1Summary() {
           </div>
         </div>
 
-        <section className="phase1-flow glass-card" aria-label="Phase 1 workflow">
-          {[
-            'Event Registration',
-            'Document / Permission Management',
-            'Authorized Official Review',
-            'Pre-Event Risk Assessment',
-            'Safety Preparation Recommendations',
-          ].map((stage, index) => (
-            <div className="phase1-flow-stage" key={stage}>
-              <span>{String(index + 1).padStart(2, '0')}</span>
-              <strong>{stage}</strong>
-              {index < 4 && <b>→</b>}
-            </div>
-          ))}
-        </section>
-
-        <section className="phase1-section">
+        <div className="phase1-top-grid">
+        <section className="phase1-section phase1-event-details-section">
           <div className="phase1-section-heading"><span>01</span><div><h2>Event Details</h2><p>Information submitted for the event registration.</p></div></div>
           <div className="phase1-detail-grid">
             {eventDetails.map(([label, value]) => <div className="phase1-detail-card glass-card" key={label}><span>{label}</span><strong>{value ?? '—'}</strong></div>)}
           </div>
         </section>
 
+        <section className="phase1-section phase1-recommendations-section">
+          <div className="phase1-section-heading"><span>05</span><div><h2>Safety Preparation Recommendations</h2><p>Preparation guidance from the backend assessment.</p></div></div>
+          <article className="phase1-content-card glass-card"><ul className="result-list">{risk.recommendations?.length ? risk.recommendations.map((recommendation, index) => <li key={index}>{recommendation}</li>) : <li>No recommendations returned by the backend.</li>}</ul></article>
+        </section>
+        </div>
+
         <section className="phase1-section">
           <div className="phase1-section-heading"><span>02</span><div><h2>Document / Permission Management</h2><p>Uploaded documents and their current official review information.</p></div></div>
           <div className="phase1-info-note">The system supports the official review process; it does not independently grant legal permission.</div>
-          {documents.length === 0 ? <div className="glass-card phase1-empty">No documents have been uploaded for this event.</div> : <div className="phase1-document-list">{documents.map((document) => <article className="phase1-document-card glass-card" key={document.id}><div><span className="document-type">{document.document_type}</span><h3>{document.document_name}</h3><p>Document ID #{document.id}</p></div><span className={`document-status ${getStatusClass(document.status)}`}>{document.status || 'Pending'}</span><div className="phase1-document-remarks"><span>AUTHORITY REMARKS</span><p>{document.remarks || 'No remarks provided yet.'}</p></div><button className="small-btn" onClick={() => openDocument(document.id)}>View Document</button></article>)}</div>}
+          {documents.length === 0 ? <div className="glass-card phase1-empty">No documents have been uploaded for this event.</div> : <div className="phase1-document-list">{documents.map((document) => <article className="phase1-document-card glass-card" key={document.id}><div><span className="document-type">{document.document_type}</span><h3>{document.document_name}</h3><p>Document ID #{document.id}</p></div><span className={`document-status ${getStatusClass(document.status)}`}>{document.status || 'Pending'}</span><div className="phase1-document-remarks"><span>AUTHORITY REMARKS</span><p>{document.remarks || 'No remarks provided yet.'}</p></div><div className="phase1-document-actions"><button className="small-btn" onClick={() => openDocument(document.id)}>View Document</button><button className="small-btn phase1-delete-document" onClick={() => setDocumentToDelete(document)}>Delete Document</button></div></article>)}</div>}
         </section>
 
-        <section className="phase1-section">
+        <div className="phase1-review-risk-grid">
+        <section className="phase1-section phase1-review-section">
           <div className="phase1-section-heading"><span>03</span><div><h2>Authorized Official Review</h2><p>Read-only summary based on the document statuses returned by the system.</p></div></div>
           <div className="phase1-review-grid">{DOCUMENT_STATUSES.map((status) => <div className="phase1-review-card glass-card" key={status}><span className={`document-status ${getStatusClass(status)}`}>{status}</span><strong>{statusCounts[status]}</strong><small>documents</small></div>)}</div>
         </section>
 
-        <section className="phase1-section">
+        <section className="phase1-section phase1-risk-section">
           <div className="phase1-section-heading"><span>04</span><div><h2>Pre-Event Risk Assessment</h2><p>Assessment returned by the existing backend risk engine.</p></div></div>
           <div className="phase1-risk-layout"><article className={`phase1-risk-level glass-card phase1-risk-${riskLevel}`}><span>RISK LEVEL</span><strong>{risk.risk_level || '—'}</strong><small>Score {risk.risk_score ?? '—'}</small></article><article className="phase1-content-card glass-card"><h3>Reasons</h3><ul className="result-list">{risk.reasons?.length ? risk.reasons.map((reason, index) => <li key={index}>{reason}</li>) : <li>No reasons returned by the backend.</li>}</ul></article></div>
         </section>
 
-        <section className="phase1-section">
-          <div className="phase1-section-heading"><span>05</span><div><h2>Safety Preparation Recommendations</h2><p>Preparation guidance returned by the existing backend assessment.</p></div></div>
-          <article className="phase1-content-card glass-card"><ul className="result-list">{risk.recommendations?.length ? risk.recommendations.map((recommendation, index) => <li key={index}>{recommendation}</li>) : <li>No recommendations returned by the backend.</li>}</ul></article>
-        </section>
+        </div>
+
       </main>
+      {documentToDelete && <div className="phase1-delete-backdrop" role="presentation" onClick={() => !deletingDocument && setDocumentToDelete(null)}><div className="phase1-delete-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}><div className="phase1-delete-icon">×</div><h2>Delete Document?</h2><p>This document will be permanently removed from this event.</p><small>{documentToDelete.document_name}</small><div className="phase1-delete-actions"><button type="button" onClick={() => setDocumentToDelete(null)} disabled={deletingDocument}>Cancel</button><button type="button" onClick={deleteDocument} disabled={deletingDocument}>{deletingDocument ? 'Deleting...' : 'Delete Document'}</button></div></div></div>}
       <footer>CrowdGuard · Phase 1 safety summary</footer>
     </div>
   )

@@ -105,13 +105,13 @@ function ApplicationStatus() {
   }
 
   return (
-    <div className="app">
+    <div className="app ember-track-page">
       <div className="background-grid" />
       <div className="glow glow-one" />
 
       <Navbar />
 
-      <main className="page-main">
+      <main className="page-main track-main">
         <section className="page-heading">
           <div className="eyebrow">
             APPLICATION TRACKING
