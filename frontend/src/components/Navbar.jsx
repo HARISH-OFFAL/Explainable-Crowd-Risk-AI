@@ -53,6 +53,8 @@ function Navbar({ showLinks = true }) {
         </div>
       </div>
 
+      {phase3EventId && pathname.endsWith('/response-commander') && <div className="response-top-tabs"><NavLink to={`/organizer/events/${phase3EventId}/response-commander`} end>Response Commander</NavLink><NavLink to={`/organizer/events/${phase3EventId}/response-commander/communication-center`}>Communication Center</NavLink></div>}
+
       {showLinks && <div className="nav-links">
         <NavLink to={authority ? '/authority/dashboard' : '/organizer/dashboard'}>
           {authority ? 'Authority Dashboard' : 'Organizer Dashboard'}
@@ -71,6 +73,7 @@ function Navbar({ showLinks = true }) {
             <NavLink to={`${base}/application-status`}>Track Status</NavLink>
             {phase3EventId && <NavLink to={`/organizer/events/${phase3EventId}/crowd-time-machine`}>Crowd Time Machine</NavLink>}
             {phase3EventId && <NavLink to={`/organizer/events/${phase3EventId}/response-commander`}>Response Commander</NavLink>}
+            {phase3EventId && <NavLink to={`/organizer/events/${phase3EventId}/explainable-ai`}>Explainable AI Assistant</NavLink>}
           </>
         )}
 

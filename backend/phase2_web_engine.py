@@ -94,6 +94,26 @@ def load_detector():
     return _model
 
 
+def warm_detector():
+    """Run one production-sized inference during API startup, not on the first click."""
+    detector = load_detector()
+    # Match the production inference shape so the first real frame does not
+    # pay the model's shape-specific warm-up cost after the user clicks Start.
+    warmup_size = DETECTION["imgsz"]
+    sample = np.zeros((warmup_size, warmup_size, 3), dtype=np.uint8)
+    with torch.inference_mode():
+        detector.predict(
+            sample,
+            classes=[PERSON_CLASS],
+            conf=DETECTION["confidence"],
+            imgsz=warmup_size,
+            max_det=DETECTION["max_det"],
+            iou=DETECTION["iou"],
+            device=0 if torch.cuda.is_available() else "cpu",
+            verbose=False,
+        )
+
+
 def density_state(people_count, intensity, active_ratio, zone_score):
     """Describe observed current density, never future risk."""
     signal = 0.45 * float(intensity) + 0.25 * min(1.0, people_count / 40.0)

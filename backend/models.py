@@ -23,6 +23,20 @@ class Event(Base):
     event_duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    full_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    organization: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+    created_at: Mapped[str] = mapped_column(String(50), nullable=False)
+    updated_at: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+
 class EventDocument(Base):
     __tablename__ = "event_documents"
 
@@ -77,6 +91,7 @@ class Phase2RiskRecord(Base):
     event_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     monitoring_session_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     timestamp: Mapped[str] = mapped_column(String(50), nullable=False)
+    source_timestamp_sec: Mapped[float | None] = mapped_column(nullable=True)
 
     zone_a_people: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     zone_b_people: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -168,6 +183,73 @@ class ResponsePlan(Base):
     updated_at: Mapped[str] = mapped_column(String(50), nullable=False)
 
 
+class CommunicationPlan(Base):
+    __tablename__ = "communication_plans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    event_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    monitoring_session_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    flow_analysis_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    instability_analysis_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    time_machine_session_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    response_plan_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    priority: Mapped[str] = mapped_column(String(30), nullable=False)
+    intent: Mapped[str] = mapped_column(String(50), nullable=False)
+    target_zone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    safe_zone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="PENDING_APPROVAL")
+    source_snapshot_json: Mapped[str] = mapped_column(Text, nullable=False)
+    approved_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    approved_at: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[str] = mapped_column(String(50), nullable=False)
+
+
+class CommunicationMessage(Base):
+    __tablename__ = "communication_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    communication_plan_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    audience: Mapped[str] = mapped_column(String(30), nullable=False)
+    language: Mapped[str] = mapped_column(String(10), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    channel: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="DRAFT")
+    approved_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sent_at: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+
+class CommunicationObservation(Base):
+    __tablename__ = "communication_observations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    communication_plan_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    observation_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    timestamp_sec: Mapped[float | None] = mapped_column(Float, nullable=True)
+    metrics_json: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class DashboardSafetyAlert(Base):
+    __tablename__ = "dashboard_safety_alerts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    event_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    monitoring_session_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    communication_plan_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    communication_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    audience: Mapped[str] = mapped_column(String(30), nullable=False)
+    priority: Mapped[str] = mapped_column(String(30), nullable=False)
+    intent: Mapped[str] = mapped_column(String(50), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    target_zone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    recommended_action: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE")
+    created_at: Mapped[str] = mapped_column(String(50), nullable=False)
+    read_at: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    dismissed_at: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    source_timestamp_sec: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+
 class VenueLayout(Base):
     __tablename__ = "venue_layouts"
 
@@ -202,4 +284,22 @@ class InstabilitySnapshot(Base):
     propagation_to: Mapped[str | None] = mapped_column(String(30), nullable=True)
     propagation_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     snapshot_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[str] = mapped_column(String(50), nullable=False)
+
+
+class StoryboardSession(Base):
+    """Persisted, reproducible Phase 6 storyboard for one monitoring lineage."""
+
+    __tablename__ = "storyboard_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    event_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    monitoring_session_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    flow_analysis_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    time_machine_session_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    instability_analysis_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    response_plan_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    algorithm_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="COMPLETE")
+    result_json: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[str] = mapped_column(String(50), nullable=False)

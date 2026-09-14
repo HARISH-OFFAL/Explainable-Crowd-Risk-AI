@@ -1,152 +1,241 @@
-"""Time-indexed, rolling-window crowd instability radar.
+"""Evidence-based Phase 4 instability analysis over Phase 3 track histories."""
 
-The radar is deliberately derived from the existing Phase 3 trajectories.  It
-does not invent motion: every snapshot is calculated from the track points that
-were visible at that video timestamp and the preceding temporal window.
-"""
-from math import hypot, sqrt
+from __future__ import annotations
+
+import logging
+import math
+import os
 from statistics import median
 
 from .schemas import number
 
+LOGGER = logging.getLogger(__name__)
 ZONES = ("ZONE_A", "ZONE_B", "ZONE_C")
-WEIGHTS = {"concentration": .10, "direction_disorder": .18, "counter_flow": .20, "compression": .24, "stop_go": .14, "speed_drop": .14}
+GRID_COLUMNS, GRID_ROWS = 20, 12
+WINDOW_SECONDS = 3.0
+EMA_ALPHA = 0.35
+NEIGHBOR_RADIUS_RATIO = 0.075
+MIN_TRACK_POINTS = 3
+MIN_TRACK_DURATION = 0.5
+MAX_TRACK_GAP = 0.75
+MOVEMENT_RATIO = 0.004
+MOVING_SPEED_FLOOR = 0.0
+WEIGHTS = {
+    "compression": 0.30,
+    "direction_disorder": 0.20,
+    "counter_flow": 0.20,
+    "stop_go": 0.15,
+    "speed_drop": 0.15,
+}
 THRESHOLDS = ((81, "SEVERE"), (66, "HIGH"), (46, "UNSTABLE"), (26, "WATCH"), (0, "STABLE"))
+HYSTERESIS = 4.0
 
 
-def level(score):
-    return next(name for threshold, name in THRESHOLDS if score >= threshold)
+def clamp(value, low=0.0, high=1.0):
+    return max(low, min(high, float(value)))
+
+
+def level(score, previous=None):
+    score = float(score)
+    current = next(name for threshold, name in THRESHOLDS if score >= threshold)
+    if previous:
+        for threshold, name in THRESHOLDS:
+            if name == previous and score >= threshold - HYSTERESIS:
+                return previous
+    return current
 
 
 def percentile(values, fraction=.9):
-    ordered = sorted(values)
-    if not ordered:
-        return 0
-    return ordered[min(len(ordered) - 1, int((len(ordered) - 1) * fraction))]
+    values = sorted(float(value) for value in values)
+    return values[min(len(values) - 1, int((len(values) - 1) * fraction))] if values else 0.0
 
 
-def _point_at(points, timestamp):
-    visible = [point for point in points if number(point.get("timestamp"), "point.timestamp") <= timestamp]
-    return visible[-1] if visible else None
-
-
-def _track_at(item, timestamp, window):
-    points = item.get("points") or []
-    current = _point_at(points, timestamp)
-    if current is None:
+def _point(point):
+    try:
+        return {"x": number(point.get("x"), "track.x"), "y": number(point.get("y"), "track.y"), "timestamp": number(point.get("timestamp"), "track.timestamp")}
+    except (AttributeError, ValueError, TypeError):
         return None
-    history = [point for point in points if timestamp - window <= number(point.get("timestamp"), "point.timestamp") <= timestamp]
-    if len(history) < 2:
-        history = points[: points.index(current) + 1] if current in points else [current]
-    if len(history) < 2:
+
+
+def _history(item, timestamp, window):
+    points = sorted((point for point in (_point(value) for value in item.get("points") or []) if point), key=lambda value: value["timestamp"])
+    points = [point for point in points if timestamp - window <= point["timestamp"] <= timestamp]
+    if len(points) < MIN_TRACK_POINTS or points[-1]["timestamp"] < timestamp - 0.5:
         return None
-    previous = history[-2]
-    dt = max(number(current.get("timestamp"), "point.timestamp") - number(previous.get("timestamp"), "point.timestamp"), .001)
-    vx = (number(current.get("x"), "point.x") - number(previous.get("x"), "point.x")) / dt
-    vy = (number(current.get("y"), "point.y") - number(previous.get("y"), "point.y")) / dt
-    speed = hypot(vx, vy)
-    speeds = []
-    for left, right in zip(history[:-1], history[1:]):
-        delta = max(number(right.get("timestamp"), "point.timestamp") - number(left.get("timestamp"), "point.timestamp"), .001)
-        speeds.append(hypot(number(right.get("x"), "point.x") - number(left.get("x"), "point.x"), number(right.get("y"), "point.y") - number(left.get("y"), "point.y")) / delta)
-    baseline = median(speeds[:-1]) if len(speeds) > 1 else speeds[-1]
-    return {"id": item.get("track_id"), "x": number(current.get("x"), "track.x"), "y": number(current.get("y"), "track.y"), "vx": vx, "vy": vy, "speed": speed, "speeds": speeds, "baseline": baseline, "history": history}
+    if points[-1]["timestamp"] - points[0]["timestamp"] < MIN_TRACK_DURATION:
+        return None
+    for left, right in zip(points[:-1], points[1:]):
+        if right["timestamp"] - left["timestamp"] > MAX_TRACK_GAP:
+            points = points[points.index(right):]
+            break
+    if len(points) < MIN_TRACK_POINTS:
+        return None
+    velocities = []
+    for left, right in zip(points[:-1], points[1:]):
+        dt = right["timestamp"] - left["timestamp"]
+        if dt <= 0 or dt > MAX_TRACK_GAP:
+            continue
+        vx = (right["x"] - left["x"]) / dt
+        vy = (right["y"] - left["y"]) / dt
+        velocities.append({"vx": vx, "vy": vy, "speed": math.hypot(vx, vy), "timestamp": right["timestamp"]})
+    if len(velocities) < 2:
+        return None
+    current = points[-1]
+    velocity = velocities[-1]
+    return {"id": item.get("track_id"), "x": current["x"], "y": current["y"], "history": points, "velocities": velocities, **velocity}
 
 
-def _region_features(local, all_speeds):
-    moving = [item for item in local if item["speed"] > 1]
-    units = [(item["vx"] / item["speed"], item["vy"] / item["speed"]) for item in moving]
-    mean_x = sum(x for x, _ in units) / max(len(units), 1)
-    mean_y = sum(y for _, y in units) / max(len(units), 1)
-    direction_disorder = 1 - min(1, sqrt(mean_x * mean_x + mean_y * mean_y)) if units else 0
-    opposing = sum(1 for x, y in units if x * mean_x + y * mean_y < -.3) / max(len(units), 1)
-    counter_flow = min(1, opposing * 2) if len(moving) >= 2 else 0
-    compression_values = []
-    for index, left in enumerate(local):
-        for right in local[index + 1:]:
-            left_history = left["history"]
-            right_history = right["history"]
-            before_left = left_history[0]
-            before_right = right_history[0]
-            before = hypot(number(before_left.get("x"), "point.x") - number(before_right.get("x"), "point.x"), number(before_left.get("y"), "point.y") - number(before_right.get("y"), "point.y"))
-            after = hypot(left["x"] - right["x"], left["y"] - right["y"])
-            if before > 0:
-                compression_values.append(max(0, min(1, (before - after) / before)))
-    compression = sum(compression_values) / max(len(compression_values), 1)
+def _neighbors(track, tracks, radius):
+    return [other for other in tracks if other["id"] != track["id"] and math.hypot(track["x"] - other["x"], track["y"] - other["y"]) <= radius]
+
+
+def _cell_key(cell):
+    return cell["row"], cell["column"]
+
+
+def _cell_features(local, all_tracks, previous_cell, radius, reference_speed, diagonal):
+    if not local:
+        return None
+    moving = [track for track in local if track["speed"] > MOVING_SPEED_FLOOR]
+    units = [(track["vx"] / track["speed"], track["vy"] / track["speed"]) for track in moving if track["speed"] > diagonal * MOVEMENT_RATIO]
+    mean_unit = (sum(unit[0] for unit in units) / len(units), sum(unit[1] for unit in units) / len(units)) if units else (0.0, 0.0)
+    alignment = math.hypot(*mean_unit)
+    disorder = 1.0 - clamp(alignment)
+
+    opposing_pairs = 0
+    pair_count = 0
+    for index, left in enumerate(moving):
+        for right in moving[index + 1:]:
+            if left["speed"] <= diagonal * MOVEMENT_RATIO or right["speed"] <= diagonal * MOVEMENT_RATIO:
+                continue
+            cosine = (left["vx"] * right["vx"] + left["vy"] * right["vy"]) / max(left["speed"] * right["speed"], 1e-6)
+            pair_count += 1
+            opposing_pairs += cosine < -0.5
+    counter_flow = clamp(opposing_pairs / max(pair_count, 1) * 2.0) if len(moving) >= 4 and opposing_pairs >= 2 else 0.0
+
+    closing, converging, distance_samples = [], [], []
+    for track in local:
+        for other in _neighbors(track, all_tracks, radius):
+            if track["id"] >= other["id"]:
+                continue
+            dx, dy = track["x"] - other["x"], track["y"] - other["y"]
+            distance = math.hypot(dx, dy)
+            if distance <= 0:
+                continue
+            previous_left, previous_right = track["history"][0], other["history"][0]
+            before = math.hypot(previous_left["x"] - previous_right["x"], previous_left["y"] - previous_right["y"])
+            distance_samples.append(clamp((before - distance) / max(before, 1e-6)))
+            radial = ((track["vx"] - other["vx"]) * dx + (track["vy"] - other["vy"]) * dy) / distance
+            converging.append(clamp(-radial / max(diagonal * .08, 1e-6)))
+            closing.append(clamp((before - distance) / max(before, 1e-6)))
+    neighbor_closing = sum(closing) / len(closing) if closing else 0.0
+    convergence = sum(converging) / len(converging) if converging else 0.0
+    previous_concentration = float((previous_cell or {}).get("concentration", len(local) / 8))
+    concentration = clamp(len(local) / 8)
+    concentration_growth = clamp(concentration - previous_concentration + .5)
+    current_speed = sum(track["speed"] for track in local) / len(local)
+    old_speed = float((previous_cell or {}).get("mean_speed", current_speed))
+    speed_reduction = clamp((old_speed - current_speed) / max(old_speed, diagonal * .004, 1e-6))
+    compression = clamp(.35 * concentration_growth + .30 * neighbor_closing + .20 * convergence + .15 * speed_reduction)
+
     transitions = 0
-    stop_count = 0
-    speed_drops = []
-    for item in local:
-        states = [speed > 1 for speed in item["speeds"]]
-        transitions += sum(first != second for first, second in zip(states, states[1:]))
-        stop_count += sum(not state for state in states)
-        speed_drops.append(max(0, min(1, (item["baseline"] - item["speed"]) / max(item["baseline"], 1))))
-    stop_go = min(1, (transitions + stop_count * .35) / max(len(local) * 3, 1)) if local else 0
-    speed_drop = sum(speed_drops) / max(len(speed_drops), 1)
-    concentration = min(1, len(local) / 8)
-    mean_speed = sum(item["speed"] for item in local) / max(len(local), 1)
-    relative_speed = min(1, mean_speed / max(median(all_speeds) if all_speeds else 1, 1))
-    score = 100 * (WEIGHTS["concentration"] * concentration + WEIGHTS["direction_disorder"] * direction_disorder + WEIGHTS["counter_flow"] * counter_flow + WEIGHTS["compression"] * compression + WEIGHTS["stop_go"] * stop_go + WEIGHTS["speed_drop"] * speed_drop)
-    return {"people": len(local), "concentration": round(concentration, 3), "average_relative_speed": round(relative_speed, 3), "direction_disorder": round(direction_disorder, 3), "compression": round(compression, 3), "counter_flow": round(counter_flow, 3), "stop_go": round(stop_go, 3), "speed_drop": round(speed_drop, 3), "instability_score": round(min(100, max(0, score)), 1), "level": level(score)}
+    transition_tracks = 0
+    for track in local:
+        states = ["MOVING" if item["speed"] > diagonal * .012 else "STOPPED" for item in track["velocities"]]
+        changes = sum(left != right for left, right in zip(states, states[1:]))
+        if changes >= 2:
+            transition_tracks += 1
+            transitions += changes
+    stop_go = clamp(transitions / max(len(local) * 3, 1)) if transition_tracks >= 2 and len(local) >= 3 else 0.0
+    speed_drop = sum(clamp((median(track["velocities"][:-1] and [item["speed"] for item in track["velocities"][:-1]] or [track["speed"]]) - track["speed"]) / max(median([item["speed"] for item in track["velocities"][:-1]] or [track["speed"]]), 1e-6)) for track in local) / len(local)
+    mean_vx = sum(track["vx"] for track in moving) / max(len(moving), 1)
+    mean_vy = sum(track["vy"] for track in moving) / max(len(moving), 1)
+    score = 100 * (WEIGHTS["compression"] * compression + WEIGHTS["direction_disorder"] * disorder + WEIGHTS["counter_flow"] * counter_flow + WEIGHTS["stop_go"] * stop_go + WEIGHTS["speed_drop"] * speed_drop)
+    return {"people": len(local), "concentration": round(concentration, 3), "mean_speed": round(current_speed, 3), "direction_disorder": round(disorder, 3), "compression": round(compression, 3), "counter_flow": round(counter_flow, 3), "stop_go": round(stop_go, 3), "speed_drop": round(speed_drop, 3), "mean_vx": round(mean_vx, 3), "mean_vy": round(mean_vy, 3), "instability_score": round(clamp(score, 0, 100), 1), "level": level(score)}
 
 
-def analyze_at(flow_result, timestamp, window_seconds=3.0, previous_snapshot=None):
+def analyze_at(flow_result, timestamp, window_seconds=WINDOW_SECONDS, previous_snapshot=None):
     frame = flow_result.get("frame") or {}
-    width = max(number(frame.get("width"), "frame.width"), 1.0)
-    height = max(number(frame.get("height"), "frame.height"), 1.0)
-    trajectories = flow_result.get("trajectories") or []
-    tracks = [track for item in trajectories if (track := _track_at(item, timestamp, window_seconds))]
-    if len(tracks) < 2:
-        raise ValueError("Insufficient tracked people in the current radar window.")
-    all_speeds = [track["speed"] for track in tracks]
-    cols, rows = 20, 12
-    cells = []
-    for row in range(rows):
-        for col in range(cols):
-            left, top = col * width / cols, row * height / rows
-            local = [track for track in tracks if left <= track["x"] < (col + 1) * width / cols and top <= track["y"] < (row + 1) * height / rows]
+    width, height = max(number(frame.get("width") or 1280), 1), max(number(frame.get("height") or 720), 1)
+    diagonal = math.hypot(width, height)
+    radius = diagonal * NEIGHBOR_RADIUS_RATIO
+    tracks = [track for item in flow_result.get("trajectories") or [] if (track := _history(item, timestamp, window_seconds))]
+    if len(tracks) < 3:
+        raise ValueError("Insufficient stable movement history.")
+    reference_speed = median([track["speed"] for track in tracks])
+    cells, previous_cells = [], {(item.get("row"), item.get("column")): item for item in (previous_snapshot or {}).get("field", [])}
+    cell_width, cell_height = width / GRID_COLUMNS, height / GRID_ROWS
+    for row in range(GRID_ROWS):
+        for column in range(GRID_COLUMNS):
+            local = [track for track in tracks if column * cell_width <= track["x"] < (column + 1) * cell_width and row * cell_height <= track["y"] < (row + 1) * cell_height]
             if not local:
                 continue
-            features = _region_features(local, all_speeds)
-            zone = ZONES[min(2, max(0, int((col + .5) / cols * 3)))]
-            cells.append({"x": round(left + width / cols / 2, 1), "y": round(top + height / rows / 2, 1), "width": round(width / cols, 1), "height": round(height / rows, 1), "zone": zone, "vx": round(sum(item["vx"] for item in local) / len(local), 2), "vy": round(sum(item["vy"] for item in local) / len(local), 2), **features})
-    zone_metrics = {}
-    zone_cells = {}
-    population_counts = ((flow_result.get("phase2_snapshot") or {}).get("zone_counts") or {})
+            features = _cell_features(local, tracks, previous_cells.get((row, column)), radius, reference_speed, diagonal)
+            zone = ZONES[min(2, int(((column + .5) / GRID_COLUMNS) * 3))]
+            cells.append({"row": row, "column": column, "x": round((column + .5) * cell_width, 1), "y": round((row + .5) * cell_height, 1), "width": round(cell_width, 1), "height": round(cell_height, 1), "zone": zone, "vx": features.pop("mean_vx"), "vy": features.pop("mean_vy"), **features})
+    zone_metrics, zone_centers = {}, {}
     for zone in ZONES:
-        local_cells = [cell for cell in cells if cell["zone"] == zone]
-        zone_cells[zone] = local_cells
-        # Trajectories are intentionally sparse: stable tracks are used for
-        # motion features, not for total occupancy.  When Phase 2 persisted a
-        # final accepted-detection snapshot, use those reconciled counts here.
-        people = int(number(population_counts.get(zone), f"phase2_snapshot.zone_counts.{zone}")) if zone in population_counts else sum(cell["people"] for cell in local_cells)
-        active_scores = [cell["instability_score"] for cell in local_cells]
-        mean_score = sum(active_scores) / max(len(active_scores), 1)
-        score = .60 * mean_score + .40 * percentile(active_scores, .90)
-        previous_score = number(((previous_snapshot or {}).get("zone_metrics") or {}).get(zone, {}).get("instability_score", score))
-        trend = "RISING" if score - previous_score >= 1.5 else "FALLING" if previous_score - score >= 1.5 else "STABLE"
-        zone_metrics[zone] = {"people": people, "concentration": round(sum(cell["concentration"] * cell["people"] for cell in local_cells) / max(people, 1), 3), "direction_disorder": round(sum(cell["direction_disorder"] * cell["people"] for cell in local_cells) / max(people, 1), 3), "compression": round(sum(cell["compression"] * cell["people"] for cell in local_cells) / max(people, 1), 3), "counter_flow": round(sum(cell["counter_flow"] * cell["people"] for cell in local_cells) / max(people, 1), 3), "stop_go": round(sum(cell["stop_go"] * cell["people"] for cell in local_cells) / max(people, 1), 3), "speed_drop": round(sum(cell["speed_drop"] * cell["people"] for cell in local_cells) / max(people, 1), 3), "average_relative_speed": round(sum(cell["average_relative_speed"] * cell["people"] for cell in local_cells) / max(people, 1), 3), "active_cell_mean": round(mean_score, 1), "active_cell_p90": round(percentile(active_scores, .90), 1), "instability_score": round(score, 1), "level": level(score), "trend": trend}
-    highest = max(ZONES, key=lambda zone: (zone_metrics[zone]["instability_score"], -ZONES.index(zone)))
-    overall = round(sum(zone_metrics[zone]["instability_score"] for zone in ZONES) / 3, 1)
-    high_cells = [cell for cell in cells if cell["instability_score"] >= 46]
-    center = {"x": round(sum(cell["x"] for cell in high_cells) / max(len(high_cells), 1), 1), "y": round(sum(cell["y"] for cell in high_cells) / max(len(high_cells), 1), 1)} if high_cells else None
-    propagation = {"from": None, "to": None, "vector": {"x": 0, "y": 0}, "confidence": 0, "label": "Propagation not established"}
-    if previous_snapshot and center and previous_snapshot.get("hotspot_centroid"):
-        previous = previous_snapshot["hotspot_centroid"]
-        dx, dy = center["x"] - previous["x"], center["y"] - previous["y"]
-        if hypot(dx, dy) >= 8:
-            propagation = {"from": previous, "to": {"x": round(center["x"] + dx, 1), "y": round(center["y"] + dy, 1)}, "vector": {"x": round(dx, 2), "y": round(dy, 2)}, "confidence": round(min(1, hypot(dx, dy) / 100), 2), "label": f"{dx:+.0f}px, {dy:+.0f}px"}
-    return {"timestamp": round(timestamp, 3), "window_seconds": window_seconds, "grid": {"columns": cols, "rows": rows, "cells": cells}, "field": cells, "zone_metrics": zone_metrics, "zone_centers": {zone: {"x": round(sum(cell["x"] * cell["people"] for cell in zone_cells[zone]) / max(zone_metrics[zone]["people"], 1), 1), "y": round(sum(cell["y"] * cell["people"] for cell in zone_cells[zone]) / max(zone_metrics[zone]["people"], 1), 1)} for zone in ZONES}, "overall_instability": overall, "overall_stability": round(100 - overall, 1), "level": level(overall), "highest_instability_zone": highest, "relative_speed_index": round(sum(track["speed"] for track in tracks) / max(median(all_speeds), 1), 2), "counter_flow_regions": [{"x": cell["x"], "y": cell["y"], "vx": cell["vx"], "vy": cell["vy"]} for cell in cells if cell["counter_flow"] >= .15], "compression_centroid": next(({"x": cell["x"], "y": cell["y"]} for cell in cells if cell["compression"] >= .15), None), "stop_go_centroid": next(({"x": cell["x"], "y": cell["y"]} for cell in cells if cell["stop_go"] > .1), None), "hotspot_centroid": center, "propagation": propagation, "active_tracks": len(tracks), "occupied_cells": len(cells), "weights": WEIGHTS, "thresholds": {str(value): name for value, name in THRESHOLDS}}
+        active = [cell for cell in cells if cell["zone"] == zone]
+        scores = [cell["instability_score"] for cell in active]
+        if not active:
+            zone_metrics[zone] = {"people": 0, "active_cells": 0, "available": False, "state": "INACTIVE", "level": "INACTIVE", "instability_score": 0, "concentration": 0, "compression": 0, "counter_flow": 0, "stop_go": 0, "direction_disorder": 0, "speed_drop": 0, "mean_speed": 0, "mean_vx": 0, "mean_vy": 0}
+            continue
+        people = sum(cell["people"] for cell in active)
+        raw_score = .60 * sum(scores) / len(scores) + .40 * percentile(scores, .90)
+        previous_zone = (previous_snapshot or {}).get("zone_metrics", {}).get(zone, {})
+        previous_score = float(previous_zone.get("instability_score", raw_score))
+        score = EMA_ALPHA * raw_score + (1 - EMA_ALPHA) * previous_score
+        zone_metrics[zone] = {"people": people, "active_cells": len(active), "available": True, "state": level(score, previous_zone.get("level")), "level": level(score, previous_zone.get("level")), "instability_score": round(score, 1), "raw_instability_score": round(raw_score, 1), **{key: round(sum(cell[key] * cell["people"] for cell in active) / max(people, 1), 3) for key in ("concentration", "compression", "counter_flow", "stop_go", "direction_disorder", "speed_drop", "mean_speed", "vx", "vy") if key in active[0]}}
+        zone_metrics[zone]["mean_vx"] = round(sum(cell["vx"] * cell["people"] for cell in active) / max(people, 1), 3)
+        zone_metrics[zone]["mean_vy"] = round(sum(cell["vy"] * cell["people"] for cell in active) / max(people, 1), 3)
+        zone_centers[zone] = {"x": round(sum(cell["x"] * cell["people"] for cell in active) / people, 1), "y": round(sum(cell["y"] * cell["people"] for cell in active) / people, 1)}
+    active_zones = [zone for zone in ZONES if zone_metrics[zone]["available"]]
+    active_scores = [zone_metrics[zone]["instability_score"] for zone in active_zones]
+    overall = .50 * (sum(active_scores) / len(active_scores)) + .50 * percentile(active_scores, .90) if active_scores else 0
+    highest = max(active_zones, key=lambda zone: zone_metrics[zone]["instability_score"]) if active_zones else None
+    hotspot_cells = [cell for cell in cells if cell["instability_score"] >= 26]
+    total_weight = sum(cell["instability_score"] * max(cell["people"], 1) for cell in hotspot_cells)
+    hotspot = {"x": round(sum(cell["x"] * cell["instability_score"] * max(cell["people"], 1) for cell in hotspot_cells) / total_weight, 1), "y": round(sum(cell["y"] * cell["instability_score"] * max(cell["people"], 1) for cell in hotspot_cells) / total_weight, 1), "score": round(max(cell["instability_score"] for cell in hotspot_cells), 1)} if hotspot_cells else None
+    def centroid(predicate):
+        selected = [cell for cell in cells if predicate(cell)]
+        weight = sum(max(cell["people"], 1) for cell in selected)
+        return {"x": round(sum(cell["x"] * max(cell["people"], 1) for cell in selected) / weight, 1), "y": round(sum(cell["y"] * max(cell["people"], 1) for cell in selected) / weight, 1)} if selected else None
+    flow_weight = sum(max(cell["people"], 1) for cell in cells)
+    flow = {"vx": round(sum(cell["vx"] * max(cell["people"], 1) for cell in cells) / max(flow_weight, 1), 3), "vy": round(sum(cell["vy"] * max(cell["people"], 1) for cell in cells) / max(flow_weight, 1), 3)}
+    snapshot = {"timestamp": round(timestamp, 3), "window_seconds": window_seconds, "available": True, "grid": {"columns": GRID_COLUMNS, "rows": GRID_ROWS, "cells": cells}, "field": cells, "zone_metrics": zone_metrics, "zone_centers": zone_centers, "overall_instability": round(overall, 1), "overall_stability": round(100 - overall, 1), "level": level(overall, (previous_snapshot or {}).get("level")), "highest_instability_zone": highest, "hotspot": hotspot, "hotspot_centroid": hotspot, "compression_centroid": centroid(lambda cell: cell["compression"] >= .15), "stop_go_centroid": centroid(lambda cell: cell["stop_go"] > .1), "counter_flow_regions": [{"x": cell["x"], "y": cell["y"], "vx": cell["vx"], "vy": cell["vy"]} for cell in cells if cell["counter_flow"] > 0], "flow": flow, "relative_speed_index": round(sum(track["speed"] for track in tracks) / max(reference_speed, 1e-6), 2), "active_tracks": len(tracks), "stable_tracks": len(tracks), "occupied_cells": len(cells), "neighbor_radius_normalized": round(radius / diagonal, 4), "weights": WEIGHTS, "ema_alpha": EMA_ALPHA, "thresholds": {str(value): name for value, name in THRESHOLDS}, "hysteresis": HYSTERESIS}
+    if os.getenv("CROWDGUARD_DEBUG_RADAR") == "1":
+        LOGGER.info("radar t=%.2f detected=%s stable=%s active_cells=%s zones=%s", timestamp, len(flow_result.get("trajectories") or []), len(tracks), len(cells), {zone: zone_metrics[zone]["instability_score"] for zone in ZONES})
+    return snapshot
 
 
-def analyze(flow_result, window_seconds=3.0, sample_fps=10):
-    timestamps = [number(point.get("timestamp"), "point.timestamp") for item in flow_result.get("trajectories") or [] for point in item.get("points") or []]
+def _propagation(snapshots):
+    points = [item.get("hotspot_centroid") for item in snapshots[-6:] if item.get("hotspot_centroid")]
+    if len(points) < 3:
+        return {"established": False, "from": None, "to": None, "dx": 0, "dy": 0, "vector": {"x": 0, "y": 0}, "confidence": 0, "label": "Propagation not established"}
+    dx = (points[-1]["x"] - points[0]["x"]) / max(len(points) - 1, 1)
+    dy = (points[-1]["y"] - points[0]["y"]) / max(len(points) - 1, 1)
+    consistency = sum(((point["x"] - points[0]["x"]) * dx + (point["y"] - points[0]["y"]) * dy) >= 0 for point in points) / len(points)
+    confidence = clamp(consistency * min(1, math.hypot(dx, dy) / 25))
+    if confidence < .45:
+        return {"established": False, "from": None, "to": None, "dx": round(dx, 2), "dy": round(dy, 2), "vector": {"x": round(dx, 2), "y": round(dy, 2)}, "confidence": round(confidence, 2), "label": "Propagation not established"}
+    return {"established": True, "from": points[0], "to": points[-1], "dx": round(dx, 2), "dy": round(dy, 2), "vector": {"x": round(dx, 2), "y": round(dy, 2)}, "confidence": round(confidence, 2), "label": f"{dx:+.0f}px, {dy:+.0f}px"}
+
+
+def _forecast(snapshot):
+    output = []
+    for horizon in (0, 10, 20, 30):
+        field = [{**cell, "x": round(cell["x"] + cell["vx"] * horizon, 1), "y": round(cell["y"] + cell["vy"] * horizon, 1)} for cell in snapshot["field"]]
+        output.append({"horizon_seconds": horizon, "timestamp": round(snapshot["timestamp"] + horizon, 3), "zone_scores": {zone: round(snapshot["zone_metrics"][zone]["instability_score"], 1) for zone in ZONES}, "field": field, "propagation": snapshot["propagation"]})
+    return output
+
+
+def analyze(flow_result, window_seconds=WINDOW_SECONDS, sample_fps=10):
+    timestamps = [number(point.get("timestamp"), "point.timestamp") for item in flow_result.get("trajectories") or [] for point in item.get("points") or [] if point.get("timestamp") is not None]
     if not timestamps:
         raise ValueError("No timestamped trajectory history is available for instability analysis.")
     start, end = min(timestamps), max(timestamps)
-    step = 1 / max(1, sample_fps)
-    snapshots = []
-    previous = None
+    snapshots, previous = [], None
+    step = 1 / max(sample_fps, 1)
     current = start
     while current <= end + .0001:
         try:
@@ -158,28 +247,9 @@ def analyze(flow_result, window_seconds=3.0, sample_fps=10):
         previous = snapshot
         current += step
     if not snapshots:
-        raise ValueError("Insufficient timestamped movement history for instability analysis.")
-    # Do not mutate the last time-series item when attaching the aggregate
-    # response; otherwise the snapshot would contain itself recursively.
+        raise ValueError("Insufficient stable movement history.")
     current = {**snapshots[-1]}
-    # Use a one-second trailing trend so the forecast is visibly responsive
-    # without amplifying single-frame noise.
-    previous_scores = snapshots[max(0, len(snapshots) - sample_fps - 1)]["zone_metrics"] if snapshots else {}
-    for zone in ZONES:
-        current["zone_metrics"][zone]["previous_score"] = previous_scores.get(zone, {}).get("instability_score", current["zone_metrics"][zone]["instability_score"])
-    current.update({"snapshots": snapshots, "sample_fps": sample_fps, "duration_start": start, "duration_end": end, "forecast": _forecast(current)})
-    for zone in ZONES:
-        current["zone_metrics"][zone].pop("previous_score", None)
+    current["snapshots"] = snapshots
+    current["propagation"] = _propagation(snapshots)
+    current["forecast"] = _forecast({**current, "propagation": current["propagation"]})
     return current
-
-
-def _forecast(snapshot):
-    current = snapshot
-    output = []
-    for horizon in (0, 10, 20, 30):
-        seconds = horizon
-        cells = []
-        for cell in current["field"]:
-            cells.append({**cell, "x": round(cell["x"] + cell["vx"] * seconds, 1), "y": round(cell["y"] + cell["vy"] * seconds, 1)})
-        output.append({"horizon_seconds": horizon, "timestamp": current["timestamp"] + seconds, "zone_scores": {zone: round(min(100, max(0, current["zone_metrics"][zone]["instability_score"] + (seconds / 10) * (current["zone_metrics"][zone]["instability_score"] - current["zone_metrics"][zone].get("previous_score", current["zone_metrics"][zone]["instability_score"])) * .2)), 1) for zone in ZONES}, "field": cells, "propagation": current["propagation"]})
-    return output

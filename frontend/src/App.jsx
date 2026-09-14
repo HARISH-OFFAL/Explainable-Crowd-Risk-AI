@@ -17,7 +17,10 @@ import FlowIntelligence from './pages/FlowIntelligence'
 import DigitalTwin from './pages/DigitalTwin'
 import CrowdTimeMachine from './pages/CrowdTimeMachine'
 import ResponseCommander from './pages/ResponseCommander'
+import CommunicationCenterPage from './pages/CommunicationCenterPage'
+import ExplainableAIPage from './pages/ExplainableAIPage'
 import Login from './pages/Login'
+import RegisterPage from './pages/RegisterPage'
 import { AuthProvider } from './auth/AuthContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { ROLES } from './config/demoAuth'
@@ -32,6 +35,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<RegisterPage />} />
 
           <Route element={<ProtectedRoute role={ROLES.ORGANIZER} />}>
             <Route path="/dashboard" element={<Dashboard />} />
@@ -49,6 +53,8 @@ function App() {
             <Route path="/organizer/events/:eventId/digital-twin/:sessionId" element={<DigitalTwin />} />
             <Route path="/organizer/events/:eventId/crowd-time-machine" element={<CrowdTimeMachine />} />
             <Route path="/organizer/events/:eventId/response-commander" element={<ResponseCommander />} />
+            <Route path="/organizer/events/:eventId/response-commander/communication-center" element={<CommunicationCenterPage />} />
+            <Route path="/organizer/events/:eventId/explainable-ai" element={<ExplainableAIPage />} />
           </Route>
 
           <Route element={<ProtectedRoute role={ROLES.AUTHORITY} />}>

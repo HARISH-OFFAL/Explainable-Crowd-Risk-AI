@@ -20,7 +20,16 @@ export function AuthProvider({ children }) {
   const value = useMemo(() => ({
     isAuthenticated: Boolean(session?.isAuthenticated),
     role: session?.role || null,
-    login(email, password, role) {
+    async login(email, password, role) {
+      try {
+        const response = await fetch('http://127.0.0.1:8000/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, role }) })
+        const data = await response.json()
+        if (response.ok && data.user) {
+          const next = { isAuthenticated: true, role: data.user.role, user: data.user, token: data.token }
+          sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next)); setSession(next); return { success: true }
+        }
+        if (response.status !== 401) return { success: false, message: data.detail }
+      } catch { /* Keep demo login available when the backend is offline. */ }
       const credential = DEMO_CREDENTIALS[role]
       if (!credential || email.trim().toLowerCase() !== credential.email || password !== credential.password) {
         return { success: false }

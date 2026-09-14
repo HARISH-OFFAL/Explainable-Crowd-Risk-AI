@@ -5,7 +5,7 @@ const API = 'http://127.0.0.1:8000'
 const ZONES = ['ZONE_A', 'ZONE_B', 'ZONE_C']
 const label = (value) => String(value || '').replaceAll('_', ' ').replace('ZONE ', 'Zone ')
 const clamp = (value, low = 0, high = 1) => Math.max(low, Math.min(high, value))
-const levelFor = (score) => score >= 66 ? 'HIGH' : score >= 36 ? 'WATCH' : 'STABLE'
+const levelFor = (score) => score >= 81 ? 'SEVERE' : score >= 66 ? 'HIGH' : score >= 46 ? 'UNSTABLE' : score >= 26 ? 'WATCH' : 'STABLE'
 
 function colorFor(score, alpha = 1) {
   const stops = [[0, [255, 145, 62]], [26, [255, 190, 71]], [46, [255, 125, 48]], [66, [255, 76, 92]], [81, [214, 59, 255]]]
@@ -84,7 +84,6 @@ function CrowdInstabilityRadar({ plan, radarData }) {
 }
 
 export default CrowdInstabilityRadar
-
 
 
 

@@ -61,6 +61,8 @@ function CustomCursor() {
     <span ref={cursorRef} className="cg-cursor" aria-hidden="true">
       <span className="cg-cursor-dot" />
       <span className="cg-cursor-ring" />
+      <span className="cg-cursor-orbit" />
+      <span className="cg-cursor-crosshair" />
     </span>
   )
 }

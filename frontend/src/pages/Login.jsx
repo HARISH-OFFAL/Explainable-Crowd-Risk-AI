@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { ROLE_LABELS, ROLES } from '../config/demoAuth'
 
 function Login() {
   const { isAuthenticated, role: currentRole, login } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [role, setRole] = useState(ROLES.ORGANIZER)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -16,14 +17,14 @@ function Login() {
 
   if (isAuthenticated) return <Navigate to={currentRole === ROLES.AUTHORITY ? '/authority/dashboard' : '/organizer/dashboard'} replace />
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
     if (busy) return
     if (!email.trim()) return setError('Email is required.')
     if (!/^\S+@\S+\.\S+$/.test(email)) return setError('Enter a valid email address.')
     if (!password) return setError('Password is required.')
     setBusy(true)
-    const result = login(email, password, role)
+    const result = await login(email, password, role)
     if (!result.success) {
       setError(`Invalid email or password for ${ROLE_LABELS[role]}.`)
       setBusy(false)
@@ -52,7 +53,7 @@ function Login() {
         {error && <div className="login-error" role="alert">{error}</div>}
         <button className="login-submit" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'LOGIN'} <span>→</span></button>
       </form>
-      <p className="login-footer-note">CrowdGuard Safety Intelligence<br /><span>Decision support for safer events.</span></p>
+      <p className="login-create-link">Don&apos;t have an account? <Link to="/register">Create Account</Link></p>{location.state?.registered && <div className="login-success" role="status">Account created successfully. Please log in.</div>}<p className="login-footer-note">CrowdGuard Safety Intelligence<br /><span>Decision support for safer events.</span></p>
     </div></section>
     {notice && <div className="login-modal-backdrop" role="presentation" onClick={() => setNotice(false)}><div className="login-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}><span className="login-kicker">DEMO ACCESS</span><h2>Predefined credentials</h2><p>Demo accounts use predefined credentials. Contact the project administrator for access.</p><button type="button" onClick={() => setNotice(false)}>Continue</button></div></div>}
   </main>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 const API_URL = 'http://127.0.0.1:8000'
-const RECORDED_VIDEOS = ['gem.mp4', 'mall.mp4', 'new_test.mp4', 'test.mp4', 'walk.mp4']
+const RECORDED_VIDEOS = ['crowd.mp4', 'gem.mp4', 'mall.mp4', 'new_test.mp4', 'test.mp4', 'walk.mp4']
 const ZONES = ['ZONE_A', 'ZONE_B', 'ZONE_C']
 const EMPTY = { status: 'IDLE', processed_frames: 0, people_count: 0, density_state: 'LOW', density_value: 0, zone_counts: { ZONE_A: 0, ZONE_B: 0, ZONE_C: 0 }, trend: [], tracks: [], heatmap: { grid: [], rows: 24, columns: 32 } }
 const label = (zone) => zone.replace('ZONE_', 'Zone ')
@@ -55,6 +55,23 @@ function MonitoringLaunch() {
   const openFlowIntelligence = async () => { if (!session?.id) return; setError(''); try { const response = await fetch(`${API_URL}/monitoring-sessions/${session.id}/flow-analysis`, { method: 'POST' }); const data = await response.json(); if (!response.ok) throw new Error(data.detail || 'Unable to prepare Flow Intelligence.'); if (!data.flow_analysis_id) throw new Error('The backend did not return a Flow Analysis ID.'); routerNavigate(`/organizer/events/${eventId}/flow-intelligence/${data.flow_analysis_id}`) } catch (reason) { setError(reason.message) } }
   useEffect(() => () => { stopMonitoring() }, [stopMonitoring])
 
+  useEffect(() => {
+    if (!session) return undefined
+    const host = document.querySelector('.monitoring-page-dark .lower-grid')
+    if (!host) return undefined
+    const trigger = document.createElement('button')
+    trigger.type = 'button'; trigger.className = 'monitor-alert-trigger'; trigger.textContent = 'ALERT'; trigger.setAttribute('aria-label', 'Send monitoring email alert')
+    const modal = document.createElement('div'); modal.className = 'monitor-alert-backdrop'; modal.hidden = true
+    modal.innerHTML = '<form class="monitor-alert-modal" role="dialog" aria-modal="true" aria-labelledby="monitor-alert-title"><h2 id="monitor-alert-title">Send monitoring alert</h2><label for="alert-recipient">Recipient Email</label><input id="alert-recipient" name="recipient_email" type="email" placeholder="recipient@example.com" required autocomplete="email"><label for="alert-note">Optional Operator Note</label><textarea id="alert-note" name="operator_note" rows="3" placeholder="Add a note (optional)"></textarea><label class="alert-attachment"><input name="attach_snapshot" type="checkbox" checked> Attach Current Monitoring Snapshot</label><p class="monitor-alert-feedback" role="status"></p><div class="monitor-alert-actions"><button type="button" class="alert-cancel">CANCEL</button><button type="submit" class="alert-send">SEND ALERT</button></div></form>'
+    host.appendChild(trigger); document.body.appendChild(modal)
+    const form = modal.querySelector('form'); const recipient = modal.querySelector('#alert-recipient'); const feedback = modal.querySelector('.monitor-alert-feedback'); const send = modal.querySelector('.alert-send')
+    const close = () => { modal.hidden = true; trigger.focus() }
+    const open = () => { modal.hidden = false; feedback.textContent = ''; recipient.focus() }
+    const submit = async (event) => { event.preventDefault(); if (send.disabled) return; send.disabled = true; feedback.textContent = 'Sending alert...'; const data = Object.fromEntries(new FormData(form)); try { const response = await fetch(`${API_URL}/monitoring-sessions/${session.id}/email-alert`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ recipient_email: data.recipient_email, operator_note: data.operator_note || '', attach_snapshot: data.attach_snapshot === 'on' }) }); const result = await response.json(); if (!response.ok) throw new Error(result.detail || 'send failed'); feedback.textContent = result.message; form.reset(); form.querySelector('[name="attach_snapshot"]').checked = true } catch { feedback.textContent = 'Unable to send monitoring alert. Please try again.' } finally { send.disabled = false } }
+    trigger.addEventListener('click', open); modal.querySelector('.alert-cancel').addEventListener('click', close); modal.addEventListener('click', (event) => { if (event.target === modal) close() }); form.addEventListener('submit', submit)
+    return () => { trigger.remove(); modal.remove() }
+  }, [session])
+
   const startMonitoring = async () => {
     setStarting(true); setError(''); let stream = null
     try {
@@ -72,7 +89,11 @@ function MonitoringLaunch() {
     if (!session || sourceMode === 'live') return undefined
     const controller = new AbortController()
     let active = true
+    let pollTimer = null
+    let polling = false
     const poll = async () => {
+      if (!active || polling) return
+      polling = true
       try {
         const response = await fetch(`${API_URL}/monitoring-sessions/${session.id}/analytics`, { signal: controller.signal })
         if (!response.ok || !active) return
@@ -83,11 +104,13 @@ function MonitoringLaunch() {
         }
       } catch (requestError) {
         if (requestError.name !== 'AbortError' && active) setError(requestError.message)
+      } finally {
+        polling = false
+        if (active) pollTimer = window.setTimeout(poll, 250)
       }
     }
-    const timer = setInterval(poll, 650)
     poll()
-    return () => { active = false; controller.abort(); clearInterval(timer) }
+    return () => { active = false; controller.abort(); if (pollTimer) window.clearTimeout(pollTimer) }
   }, [session, sourceMode])
 
   // Let recorded media use native browser playback. The detector runs on a

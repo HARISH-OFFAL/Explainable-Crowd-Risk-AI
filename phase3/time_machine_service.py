@@ -4,6 +4,8 @@ from pathlib import Path
 import math
 import time
 import logging
+import hashlib
+import json
 
 import cv2
 import numpy as np
@@ -14,9 +16,39 @@ ZONES = ("ZONE_A", "ZONE_B", "ZONE_C")
 HORIZONS = (0, 15, 30, 60)
 # Time Machine is a future-estimation pass, so it can sample less densely than
 # live monitoring while still preserving enough movement history for projection.
-SAMPLE_FPS = 3.0
-TIME_MACHINE_IMGSZ = min(DETECTION["imgsz"], 768)
+SAMPLE_FPS = 1.5
+TIME_MACHINE_IMGSZ = min(DETECTION["imgsz"], 512)
+CACHE_DIR = Path(__file__).resolve().parent / "time_machine_cache"
+CACHE_VERSION = 2
 logger = logging.getLogger(__name__)
+
+
+def _cache_path(video_path):
+    stat = video_path.stat()
+    identity = f"{video_path.name}:{stat.st_size}:{stat.st_mtime_ns}:{SAMPLE_FPS}:{TIME_MACHINE_IMGSZ}:{CACHE_VERSION}"
+    return CACHE_DIR / f"{hashlib.sha256(identity.encode()).hexdigest()}.json"
+
+
+def load_cached_time_machine(video_name):
+    path = VIDEO_DIR / Path(video_name).name
+    if not path.is_file():
+        return None
+    cache_path = _cache_path(path)
+    try:
+        if cache_path.is_file():
+            return json.loads(cache_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        logger.warning("Ignoring invalid Time Machine cache: %s", cache_path)
+    return None
+
+
+def save_cached_time_machine(video_name, result):
+    path = VIDEO_DIR / Path(video_name).name
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache_path = _cache_path(path)
+    temporary = cache_path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(result), encoding="utf-8")
+    temporary.replace(cache_path)
 
 
 def _dense_scale_counts(raw_counts, timestamp, video_name):
@@ -77,6 +109,8 @@ def analyze_time_machine(video_name, progress_callback=None):
     sampled = 0
     last_positions = []
     last_timestamp = 0.0
+    next_track_id = 1
+    previous_frame = []
     started = time.perf_counter()
     try:
         index = 0
@@ -88,24 +122,50 @@ def analyze_time_machine(video_name, progress_callback=None):
                 index += 1
                 continue
             timestamp = index / fps
-            result = detector.track(frame, persist=True, classes=[PERSON_CLASS], conf=DETECTION["confidence"], imgsz=TIME_MACHINE_IMGSZ, max_det=DETECTION["max_det"], iou=DETECTION["iou"], verbose=False)[0]
+            # Time Machine renders one ghost per detected person. Tracker IDs
+            # are optional here: ByteTrack can collapse to a single ID on a
+            # sparse sampled stream even when YOLO detects the full crowd.
+            # Direct detection keeps every person in the latest snapshot;
+            # stable IDs are still used when available from prior histories.
+            result = detector.predict(frame, classes=[PERSON_CLASS], conf=DETECTION["confidence"], imgsz=TIME_MACHINE_IMGSZ, max_det=DETECTION["max_det"], iou=DETECTION["iou"], verbose=False)[0]
             boxes = result.boxes
             current = []
-            detected_positions = []
+            frame_positions = []
             if boxes is not None and len(boxes):
                 coordinates = boxes.xyxy.cpu().tolist()
-                ids = boxes.id.int().cpu().tolist() if boxes.id is not None else []
-                for position, box in enumerate(coordinates):
+                for box in coordinates:
                     x1, y1, x2, y2 = box
                     anchor = ((x1 + x2) / 2.0, y2)
                     if 0 <= anchor[0] <= width and 0 <= anchor[1] <= height:
-                        detected_positions.append((None, anchor[0], anchor[1]))
-                        if position < len(ids):
-                            current.append((int(ids[position]), anchor[0], anchor[1]))
-            if detected_positions:
-                # Keep IDs when ByteTrack supplied them; use untracked
-                # positions only for the current occupancy count.
-                last_positions = current if current else detected_positions
+                        frame_positions.append((None, anchor[0], anchor[1]))
+            if frame_positions:
+                # Associate detections between sampled frames with a small,
+                # deterministic nearest-neighbour tracker. This keeps each
+                # person's velocity, so future horizons visibly move instead
+                # of drawing every ghost at the same location.
+                assigned = []
+                used_previous = set()
+                for _, x, y in frame_positions:
+                    candidate = min(
+                        (
+                            (index, (x - old_x) ** 2 + (y - old_y) ** 2)
+                            for index, (_, old_x, old_y) in enumerate(previous_frame)
+                            if index not in used_previous
+                        ),
+                        key=lambda item: item[1],
+                        default=None,
+                    )
+                    if candidate is not None and candidate[1] <= 80 ** 2:
+                        previous_index = candidate[0]
+                        used_previous.add(previous_index)
+                        track_id = previous_frame[previous_index][0]
+                    else:
+                        track_id = next_track_id
+                        next_track_id += 1
+                    assigned.append((track_id, x, y))
+                previous_frame = assigned
+                current = assigned
+                last_positions = assigned
                 last_timestamp = timestamp
             for track_id, x, y in current:
                 history = histories[track_id]
@@ -124,6 +184,24 @@ def analyze_time_machine(video_name, progress_callback=None):
     current_counts = _dense_scale_counts(raw_current_counts, last_timestamp, path.name)
     active_ids = {track_id for track_id, _, _ in last_positions if track_id is not None}
     active_tracks = {track_id: track for track_id, track in tracks.items() if track_id in active_ids}
+    # Give detections without a tracker ID a deterministic local ID. They have
+    # no reliable velocity, so they remain at their latest observed anchor,
+    # but still receive their own ghost in the future view.
+    for position, (track_id, x, y) in enumerate(last_positions):
+        if track_id is not None:
+            continue
+        synthetic_id = -(position + 1)
+        while synthetic_id in active_tracks:
+            synthetic_id -= 1
+        active_tracks[synthetic_id] = {
+            "track_id": synthetic_id,
+            "x": x,
+            "y": y,
+            "vx": 0.0,
+            "vy": 0.0,
+            "zone": zone_for(x, width),
+            "history_length": 1,
+        }
     stable_counts = {zone: sum(1 for track in active_tracks.values() if track["zone"] == zone) for zone in ZONES}
     untracked_counts = {zone: max(0, current_counts[zone] - stable_counts[zone]) for zone in ZONES}
     predictions = {}
